@@ -3,6 +3,7 @@
 #include <deque>
 #include <atomic>
 #include "DataPoint.h"
+#include <mutex>
 
 class LayerTrainingData {
 public:
@@ -27,11 +28,15 @@ class Gradients {
 private:
 	std::vector<std::vector<double>> weight_gradients;
 	std::vector<std::vector<double>> bias_gradients;
+	std::mutex _mutex;
 
 public:
 	Gradients() = delete;
 	Gradients(std::vector<Layer>& layers);
 	void reset();
+
+	void lock();
+	void release();
 
 	double get_weight(size_t layer, size_t index);
 	double get_bias(size_t layer, size_t index);

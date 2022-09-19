@@ -7,8 +7,10 @@
 #include <math.h>
 #include <functional>
 #include <algorithm>
+#include <numeric>
 #include <filesystem>
 #include "util.h"
+#include "Timer.h"
 
 double Layer::calculate_node(int node_index, const std::vector<double>& inputs) {
 	assert(node_index < size);
@@ -65,6 +67,16 @@ void Gradients::reset() {
 	}
 }
 
+void Gradients::lock()
+{
+	_mutex.lock();
+}
+
+void Gradients::release()
+{
+	_mutex.unlock();
+}
+
 double Gradients::get_weight(size_t layer, size_t index)
 {
 	return weight_gradients.at(layer).at(index);
@@ -103,72 +115,78 @@ double Network::mean_squared_error()
 
 void Network::process_batch(size_t batch_start, size_t batch_len, Gradients *gradients) 
 {
-	//todo: reuse?
-	std::vector<LayerTrainingData> layer_data(layers.size());
-	for (int layer = 0; layer < layers.size(); layer++) {
-		layer_data[layer].activation_inputs.resize(layers[layer].size);
-		layer_data[layer].deltas.resize(layers[layer].size);
-		layer_data[layer].output.resize(layers[layer].size);
-	}
-
-	for (int data_index = 0; data_index < batch_len; data_index++) {
-
-		const auto& data = training_data[batch_start + data_index];
-		const std::vector<double> &input = data.get_input();
-		const std::vector<double> &expected = data.get_expected();
-
-		calculate(input, layer_data);
-		std::vector<double>& output = layer_data[layers.size() - 1].output;
-		//const auto& result = get_result();
-
-		//backpropogation
-		//output layer
-		int layer_index = layers.size() - 1;
-		auto& out_layer = layers[layer_index];
-		assert(expected.size() == out_layer.size);
-		for (int node_index = 0; node_index < out_layer.size; node_index++) {
-			double o = output[node_index];
-			double cd = cost_derivative(o, expected[node_index]);
-			double ad = sigmoid_derivative(layer_data[layers.size() - 1].activation_inputs[node_index]);
-			double delta = cd * ad;
-			layer_data[layers.size() - 1].deltas[node_index] = delta;
+	int nthreads = 4;
+	batch_function task = [&](size_t thread_index, size_t start_index, size_t count) {
+		//todo: reuse?
+		std::vector<LayerTrainingData> layer_data(layers.size());
+		for (int layer = 0; layer < layers.size(); layer++) {
+			layer_data[layer].activation_inputs.resize(layers[layer].size);
+			layer_data[layer].deltas.resize(layers[layer].size);
+			layer_data[layer].output.resize(layers[layer].size);
 		}
 
-		//hidden layers
-		for (layer_index = layers.size() - 2; layer_index >= 0; layer_index--) {
-			auto& layer = layers[layer_index];
-			auto& this_layer_data = layer_data[layer_index];
-			auto& last_layer = layers[layer_index + 1];
-			auto& last_layer_data = layer_data[layer_index + 1];
-			for (int node_index = 0; node_index < layer.size; node_index++) {
+		for (int data_index = start_index; data_index < count; data_index++) {
 
-				double sum_of_weighted_errors = 0.0;
-				for (int last_node_index = 0; last_node_index < last_layer.size; last_node_index++) {
-					int weight_index = (last_node_index * last_layer.input_size + node_index);
-					double we = last_layer_data.deltas[last_node_index] * last_layer.weights[weight_index];
-					sum_of_weighted_errors += we;
-				}
-				this_layer_data.deltas[node_index] = sum_of_weighted_errors * sigmoid_derivative(this_layer_data.activation_inputs[node_index]);
+			const auto& data = training_data[batch_start + data_index];
+			const std::vector<double>& input = data.get_input();
+			const std::vector<double>& expected = data.get_expected();
+
+			calculate(input, layer_data);
+			std::vector<double>& output = layer_data[layers.size() - 1].output;
+			//const auto& result = get_result();
+
+			//backpropogation
+			//output layer
+			int layer_index = layers.size() - 1;
+			auto& out_layer = layers[layer_index];
+			assert(expected.size() == out_layer.size);
+			for (int node_index = 0; node_index < out_layer.size; node_index++) {
+				double o = output[node_index];
+				double cd = cost_derivative(o, expected[node_index]);
+				double ad = sigmoid_derivative(layer_data[layers.size() - 1].activation_inputs[node_index]);
+				double delta = cd * ad;
+				layer_data[layers.size() - 1].deltas[node_index] = delta;
 			}
-		}
 
-		//feed gradients forward
-		const std::vector<double>* cur_input = &input;
-		for (layer_index = 0; layer_index < layers.size(); layer_index++) {
-			auto& layer = layers[layer_index];
-			auto& this_layer_data = layer_data[layer_index];
+			//hidden layers
+			for (layer_index = layers.size() - 2; layer_index >= 0; layer_index--) {
+				auto& layer = layers[layer_index];
+				auto& this_layer_data = layer_data[layer_index];
+				auto& last_layer = layers[layer_index + 1];
+				auto& last_layer_data = layer_data[layer_index + 1];
+				for (int node_index = 0; node_index < layer.size; node_index++) {
 
-			for (int node_index = 0; node_index < layer.size; node_index++) {
-				for (int input_index = 0; input_index < layer.input_size; input_index++) {
-					int i = node_index * layer.input_size + input_index;
-					double grad = cur_input->at(input_index) * this_layer_data.deltas[node_index];
-					gradients->add_to_weight(layer_index, i, grad);
+					double sum_of_weighted_errors = 0.0;
+					for (int last_node_index = 0; last_node_index < last_layer.size; last_node_index++) {
+						int weight_index = (last_node_index * last_layer.input_size + node_index);
+						double we = last_layer_data.deltas[last_node_index] * last_layer.weights[weight_index];
+						sum_of_weighted_errors += we;
+					}
+					this_layer_data.deltas[node_index] = sum_of_weighted_errors * sigmoid_derivative(this_layer_data.activation_inputs[node_index]);
 				}
-				gradients->add_to_bias(layer_index, node_index, 1 * this_layer_data.deltas[node_index]);
 			}
-			cur_input = &this_layer_data.output;
+
+			//feed gradients forward
+			const std::vector<double>* cur_input = &input;
+			gradients->lock();
+			for (layer_index = 0; layer_index < layers.size(); layer_index++) {
+				auto& layer = layers[layer_index];
+				auto& this_layer_data = layer_data[layer_index];
+
+				for (int node_index = 0; node_index < layer.size; node_index++) {
+					for (int input_index = 0; input_index < layer.input_size; input_index++) {
+						int i = node_index * layer.input_size + input_index;
+						double grad = cur_input->at(input_index) * this_layer_data.deltas[node_index];
+						gradients->add_to_weight(layer_index, i, grad);
+					}
+					gradients->add_to_bias(layer_index, node_index, 1 * this_layer_data.deltas[node_index]);
+				}
+				cur_input = &this_layer_data.output;
+			}
+			gradients->release();
 		}
-	}
+	};
+	batch_jobs(task, nthreads, batch_len);
 }
 
 void Network::train() 
@@ -177,10 +195,11 @@ void Network::train()
 	Gradients gradients(layers);
 
 	_training = true;
+	Timer epoch_timer("Epoch");
 	while (_training) {
 		_training_accuracy = test_training_accuracy();
 		std::cout << "training_accuracy" << _training_accuracy << std::endl;
-		auto epoch_start = std::chrono::high_resolution_clock::now();
+		epoch_timer.reset();
 		for (int batch_index = 0; batch_index < training_data.size(); batch_index += batch_size) {
 			//reset all the gradients
 			gradients.reset();
@@ -209,9 +228,7 @@ void Network::train()
 			//std::cout << "pb" << std::endl;
 			//debug();
 		}
-		auto epoch_finish = std::chrono::high_resolution_clock::now();
-		auto duration = duration_cast<std::chrono::milliseconds>(epoch_finish - epoch_start);
-		std::cout << "Epoch duration: " << duration << "ms" << std::endl;
+		epoch_timer.end();
 		//debug();
 
 		//error = error / training_data.size();
@@ -221,18 +238,23 @@ void Network::train()
 void Network::debug() {};
 
 double Network::test_training_accuracy() {
-	auto test_start = std::chrono::high_resolution_clock::now();
-	int correct = 0;
-	for (const auto& point : training_data) {
-		auto output = calculate(point.get_input());
-		if (point.is_correct(output)) {
-			correct++;
+	Timer t("training_accuracy");
+	int nthreads = 4;
+	std::vector<int> correct(nthreads);
+
+	batch_function task = [&](size_t thread_index, size_t start_index, size_t count) {
+		for (size_t i = start_index; i < start_index + count; i++) {
+			const auto &point = training_data[i];
+			auto output = calculate(point.get_input());
+			if (point.is_correct(output)) {
+				correct[thread_index] += 1;
+			}
 		}
-	}
-	auto test_finish = std::chrono::high_resolution_clock::now();
-	auto duration = duration_cast<std::chrono::milliseconds>(test_finish - test_start);
-	std::cout << "test duration: " << duration << "ms" << std::endl;
-	return (double)correct / training_data.size();
+	};
+	batch_jobs(task, nthreads, training_data.size());
+	int total_correct = std::accumulate(correct.begin(), correct.end(), 0);
+
+	return (double)total_correct / training_data.size();
 }
 
 void Network::test()

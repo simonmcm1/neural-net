@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <thread>
+#include <functional>
 
 double get_random();
 
@@ -19,3 +21,6 @@ double cost_derivative(double output, double expected);
 void read_file(const std::string& path, std::vector<uint8_t>& buffer);
 
 uint32_t from_big_endian(uint8_t* data);
+
+using batch_function = std::function<void(size_t, size_t, size_t)>;
+void batch_jobs(batch_function& task, int nthreads, size_t data_len);

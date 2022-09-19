@@ -63,3 +63,22 @@ void read_file(const std::string& path, std::vector<uint8_t>& buffer)
 uint32_t from_big_endian(uint8_t* data) {
 	return (data[3] << 0) | (data[2] << 8) | (data[1] << 16) | ((unsigned)data[0] << 24);
 }
+
+void batch_jobs(batch_function &task, int nthreads, size_t data_len)
+{
+	std::vector<std::thread> threads;
+	size_t batch_size = data_len / nthreads + 1;
+	size_t data_index = 0;
+	for (int i = 0; i < nthreads; i++) {
+		size_t len = std::min(batch_size, data_len - data_index - 1);
+		auto ttask = std::thread(task, i, data_index, len);
+		threads.push_back(std::move(ttask));
+		data_index += len;
+	}
+	assert(data_index == data_len);
+	for (auto& thread : threads) {
+		thread.join();
+	}
+
+}
+
