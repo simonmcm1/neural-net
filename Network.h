@@ -1,6 +1,15 @@
 #pragma once
 #include <vector>
+#include <deque>
+#include <atomic>
 #include "DataPoint.h"
+
+class LayerTrainingData {
+public:
+	std::vector<double> activation_inputs;
+	std::vector<double> deltas;
+	std::vector<double> output;
+};
 
 class Layer {
 public:
@@ -8,14 +17,26 @@ public:
 	int size;
 	std::vector<double> weights;
 	std::vector<double> biases;
-	std::vector<double> output;
-
-	std::vector<double> activation_inputs;
-	std::vector<double> deltas;
 
 	void init();
 	double calculate_node(int node_index, const std::vector<double>& inputs);
-	void calculate(const std::vector<double>& inputs);
+	std::vector<double> calculate(const std::vector<double>& inputs, LayerTrainingData *training_data);
+};
+
+class Gradients {
+private:
+	std::vector<std::vector<double>> weight_gradients;
+	std::vector<std::vector<double>> bias_gradients;
+
+public:
+	Gradients() = delete;
+	Gradients(std::vector<Layer>& layers);
+	void reset();
+
+	double get_weight(size_t layer, size_t index);
+	double get_bias(size_t layer, size_t index);
+	void add_to_weight(size_t layer, size_t index, double delta);
+	void add_to_bias(size_t layer, size_t index, double delta);
 };
 
 class Network {
@@ -38,13 +59,12 @@ public:
 	virtual void load_data() = 0;
 	double test_training_accuracy();
 
-	void process_batch(size_t batch_start, size_t batch_len,
-		std::vector<std::vector<double>>* weight_gradients,
-		std::vector<std::vector<double>>* bias_gradients);
+	void process_batch(size_t batch_start, size_t batch_len, Gradients *gradients);
 	void train();
 	void test();
-	void calculate(const std::vector<double>& input);
-	std::vector<double> &get_result();
+	std::vector<double> calculate(const std::vector<double>& input);
+	void calculate(const std::vector<double>& input, std::vector<LayerTrainingData>& training_data);
+	//std::vector<double> &get_result();
 	double get_accuracy();
 
 };
