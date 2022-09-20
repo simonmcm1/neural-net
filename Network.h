@@ -4,6 +4,7 @@
 #include <atomic>
 #include "DataPoint.h"
 #include <mutex>
+#include "ThreadPool.h"
 
 class LayerTrainingData {
 public:
@@ -56,7 +57,11 @@ protected:
 	
 	
 	virtual void debug();
+
+	ThreadPool thread_pool;
 public:
+	Network() : thread_pool(4) {};
+
 	int batch_size = 32;
 	double learn_rate = 0.05;
 

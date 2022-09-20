@@ -8,7 +8,7 @@ add_compile_options("/std:c++latest")
 project ("ML")
 
 # Add source to this project's executable.
-add_executable (ML "ML.cpp" "ML.h" "Network.h" "Network.cpp" "DataPoint.h" "DataPoint.cpp" "networks/mnist.h" "util.cpp" "util.h" "networks/mnist.cpp" "networks/test.h" "networks/test.cpp" "networks/seb.h" "networks/seb.cpp" "Timer.h" "Timer.cpp")
+add_executable (ML "ML.cpp" "ML.h" "Network.h" "Network.cpp" "DataPoint.h" "DataPoint.cpp" "networks/mnist.h" "util.cpp" "util.h" "networks/mnist.cpp" "networks/test.h" "networks/test.cpp" "networks/seb.h" "networks/seb.cpp" "Timer.h" "Timer.cpp" "ThreadPool.h" "ThreadPool.cpp" "Logging.h" "Logging.cpp")
 
 #target_link_directories(ML PRIVATE "${VCPKG_INSTALLED_DIR}/${VCPKG_TAGET_TRIPLET}/debug")
 set(Python_ROOT_DIR "%LOCALAPPDATA%/Programs/Python/Python310")

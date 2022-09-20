@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <filesystem>
 #include "util.h"
+#include "ThreadPool.h"
+#include <memory>
 
 double random01()
 {
@@ -63,6 +65,8 @@ void read_file(const std::string& path, std::vector<uint8_t>& buffer)
 uint32_t from_big_endian(uint8_t* data) {
 	return (data[3] << 0) | (data[2] << 8) | (data[1] << 16) | ((unsigned)data[0] << 24);
 }
+
+
 
 void batch_jobs(batch_function &task, int nthreads, size_t data_len)
 {

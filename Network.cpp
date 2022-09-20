@@ -186,7 +186,7 @@ void Network::process_batch(size_t batch_start, size_t batch_len, Gradients *gra
 			gradients->release();
 		}
 	};
-	batch_jobs(task, nthreads, batch_len);
+	thread_pool.batch_jobs(task, batch_len);
 }
 
 void Network::train() 
