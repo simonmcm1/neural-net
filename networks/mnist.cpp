@@ -15,6 +15,10 @@ void MNISTNetwork::build()
 	output->input_size = hidden->size;
 	output->size = 10;
 	output->init();
+
+	for (int i = 0; i < layers.size(); i++) {
+		layers[i].index = i;
+	}
 }
 
 void MNISTNetwork::load_data() {

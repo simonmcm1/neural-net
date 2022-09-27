@@ -6,6 +6,7 @@
 
 ThreadPool::ThreadPool(int nthreads) : _nthreads(nthreads)
 {
+	LOG_DEBUG("ThreadPool: Starting {} threads", nthreads);
 	//spin up the actual threads
 	for (int i = 0; i < _nthreads; i++) {
 		_threads.push_back(std::thread(&ThreadPool::SchedulerLoop, this,  i));
@@ -30,7 +31,7 @@ void ThreadPool::SchedulerLoop(int thread_index)
 		}
 		
 		if (job == nullptr) {
-			std::this_thread::yield();
+			//std::this_thread::yield();
 			continue;
 		}
 		else {

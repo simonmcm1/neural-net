@@ -13,14 +13,18 @@ public:
 	}
 };
 
-inline StdoutLogger debug("DEBUG");
-inline StdoutLogger trace("TRACE");
+class Logs {
+public:
+	static StdoutLogger debug;
+	static StdoutLogger trace;
+};
 
 //#define ENABLE_TRACE
-#define LOG_DEBUG(...) debug.print(__VA_ARGS__);
+
+#define LOG_DEBUG(...) Logs::debug.print(__VA_ARGS__);
 
 #ifdef ENABLE_TRACE
-#define LOG_TRACE(...) trace.print(__VA_ARGS__);
+#define LOG_TRACE(...) Logs::trace.print(__VA_ARGS__);
 #else
 #define LOG_TRACE(...) 
 #endif
