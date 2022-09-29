@@ -93,44 +93,6 @@ const std::vector<double>& LayerTrainingData::get_full_output(size_t layer) cons
 	return output[layer];
 }
 
-
-Gradients::Gradients(const std::vector<Layer>& layers)
-{
-	weight_gradients.resize(layers.size());
-	bias_gradients.resize(layers.size());
-	for (int i = 0; i < layers.size(); i++) {
-		weight_gradients[i].resize(layers[i].weights.size(), 0.0);
-		bias_gradients[i].resize(layers[i].biases.size(), 0.0);
-	}
-}
-
-void Gradients::reset() {
-	for (size_t layer = 0; layer < weight_gradients.size(); layer++) {
-		std::fill(weight_gradients[layer].begin(), weight_gradients[layer].end(), 0.0);
-		std::fill(bias_gradients[layer].begin(), bias_gradients[layer].end(), 0.0);
-	}
-}
-
-double Gradients::get_weight(size_t layer, size_t index)
-{
-	return weight_gradients.at(layer).at(index);
-}
-
-double Gradients::get_bias(size_t layer, size_t index)
-{
-	return bias_gradients.at(layer).at(index);
-}
-
-void Gradients::add_to_weight(size_t layer, size_t index, double delta)
-{
-	weight_gradients.at(layer)[index] += delta;
-}
-
-void Gradients::add_to_bias(size_t layer, size_t index, double delta)
-{
-	bias_gradients.at(layer)[index] += delta;
-}
-
 //std::vector<double>& Network::get_result()
 //{
 //	return layers.back().output;
@@ -147,171 +109,7 @@ double Network::mean_squared_error()
 	return error / training_data.size();
 }
 
-void Network::process_batch(size_t batch_start, size_t batch_len, Gradients *gradients) 
-{
-	//Timer t("Network::process_batch");
-	if (per_thread_gradients.size() == 0) {
-		//initialize on first entry
-		for (int i = 0; i < thread_pool.nthreads(); i++) {
-			per_thread_gradients.push_back(std::make_unique<Gradients>(layers));
-		}
-	}
-	else {
-		for (auto& gradient : per_thread_gradients) {
-			gradient->reset();
-		}
-	}
-
-	if (per_thread_training_data.size() == 0) {
-		//initialize on first entry
-		for (int i = 0; i < thread_pool.nthreads(); i++) {
-			per_thread_training_data.push_back(LayerTrainingData(layers));
-		}
-	}
-	else {
-		for (auto& training_data : per_thread_training_data) {
-			training_data.reset();
-		}
-	}
-	
-	batch_function task = [&](size_t thread_index, size_t start_index, size_t count) {
-		LayerTrainingData &layer_data = per_thread_training_data.at(thread_index);
-
-		for (int data_index = start_index; data_index < start_index + count; data_index++) {
-
-			const auto& data = training_data[batch_start + data_index];
-			const std::vector<double>& input = data.get_input();
-			const std::vector<double>& expected = data.get_expected();
-
-			calculate(input, &layer_data);
-			const std::vector<double>& output = layer_data.get_full_output(layers.size() - 1);
-			//const auto& result = get_result();
-
-			//backpropogation
-			//output layer
-			int layer_index = layers.size() - 1;
-			auto& out_layer = layers[layer_index];
-			assert(expected.size() == out_layer.size);
-			for (int node_index = 0; node_index < out_layer.size; node_index++) {
-				double o = output[node_index];
-				double cd = cost_derivative(o, expected[node_index]);
-				double ad = sigmoid_derivative(layer_data.get_activation_input(layers.size() - 1, node_index));
-				double delta = cd * ad;
-				layer_data.set_delta(layers.size() - 1, node_index, delta);
-			}
-
-			//hidden layers
-			for (layer_index = layers.size() - 2; layer_index >= 0; layer_index--) {
-				auto& layer = layers[layer_index];
-				//auto& this_layer_data = layer_data[layer_index];
-				int last_layer_index = layer_index + 1;
-				auto& last_layer = layers[last_layer_index];
-				
-				//auto& last_layer_data = layer_data[layer_index + 1];
-				for (int node_index = 0; node_index < layer.size; node_index++) {
-
-					double sum_of_weighted_errors = 0.0;
-					for (int last_node_index = 0; last_node_index < last_layer.size; last_node_index++) {
-						int weight_index = (last_node_index * last_layer.input_size + node_index);
-						double we = layer_data.get_delta(last_layer_index, last_node_index) * last_layer.weights[weight_index];
-						sum_of_weighted_errors += we;
-					}
-					double new_delta = sum_of_weighted_errors * sigmoid_derivative(layer_data.get_activation_input(layer_index, node_index));
-					layer_data.set_delta(layer_index, node_index, new_delta);
-				}
-			}
-
-			//feed gradients forward
-			const std::vector<double>* cur_input = &input;
-			for (layer_index = 0; layer_index < layers.size(); layer_index++) {
-				auto& layer = layers[layer_index];
-
-				for (int node_index = 0; node_index < layer.size; node_index++) {
-					for (int input_index = 0; input_index < layer.input_size; input_index++) {
-						int i = node_index * layer.input_size + input_index;
-						double grad = cur_input->at(input_index) * layer_data.get_delta(layer_index, node_index);
-						per_thread_gradients.at(thread_index)->add_to_weight(layer_index, i, grad);
-					}
-					per_thread_gradients.at(thread_index)->add_to_bias(layer_index, node_index, 1 * layer_data.get_delta(layer_index, node_index));
-				}
-				cur_input = &layer_data.get_full_output(layer_index);
-			}
-		}
-	};
-
-	thread_pool.batch_jobs(task, batch_len);
-
-	//add up all the per-thread results
-	for (auto& per_thread : per_thread_gradients) {
-		for (int layer_index = 0; layer_index < layers.size(); layer_index++) {
-			for (int weight_index = 0; weight_index < layers.at(layer_index).weights.size(); weight_index++) {
-				double w = per_thread->get_weight(layer_index, weight_index);
-				gradients->add_to_weight(layer_index, weight_index, w);
-			}
-			for (int bias_index = 0; bias_index < layers.at(layer_index).biases.size(); bias_index++) {
-				gradients->add_to_bias(layer_index, bias_index, per_thread->get_bias(layer_index, bias_index));
-			}
-		}
-	}
-}
-
-void Network::train() 
-{	
-	Gradients gradients(layers);
-
-	_training = true;
-	Timer epoch_timer("Epoch");
-	while (_training) {
-		_training_accuracy = test_training_accuracy();
-		std::cout << "training_accuracy" << _training_accuracy << std::endl;
-		epoch_timer.reset();
-		for (int batch_index = 0; batch_index < training_data.size(); batch_index += batch_size) {
-			//reset all the gradients
-			gradients.reset();
-
-			int real_batch_size = std::min((size_t)batch_size, training_data.size() - batch_index);
-			process_batch(batch_index, real_batch_size, &gradients);
-
-			//now apply all the gradients
-			for (int layer_index = 0; layer_index < layers.size(); layer_index++) {
-				auto& layer = layers[layer_index];
-				for (int weight_index = 0; weight_index < layer.weights.size(); weight_index++) {
-					double original = layer.weights[weight_index];
-					layer.weights[weight_index] = original - gradients.get_weight(layer_index, weight_index) * learn_rate / real_batch_size;
-				}
-				for (int bias_index = 0; bias_index < layer.biases.size(); bias_index++) {
-					double original = layer.biases[bias_index];
-					layer.biases[bias_index] = original - gradients.get_bias(layer_index, bias_index) * learn_rate / real_batch_size;
-				}
-			}
-			//debug();
-		}
-		epoch_timer.end();
-		Timer::print_usage_report();
-		//debug();
-	}
-}
-
 void Network::debug() {};
-
-double Network::test_training_accuracy() {
-	Timer t("training_accuracy");
-
-	std::vector<int> correct(thread_pool.nthreads(), 0);
-	batch_function task = [&](size_t thread_index, size_t start_index, size_t count) {
-		for (size_t i = start_index; i < start_index + count; i++) {
-			const auto &point = training_data[i];
-			auto output = calculate(point.get_input());
-			if (point.is_correct(output)) {
-				correct[thread_index] += 1;
-			}
-		}
-	};
-	thread_pool.batch_jobs(task, training_data.size());
-	int total_correct = std::accumulate(correct.begin(), correct.end(), 0);
-
-	return (double)total_correct / training_data.size();
-}
 
 void Network::test()
 {
@@ -337,6 +135,7 @@ std::vector<double> Network::calculate(const std::vector<double>& input)
 	return res;
 }
 
+
 void Network::calculate(const std::vector<double>& input, LayerTrainingData *layer_training_data)
 {
 	layers[0].calculate(input, layer_training_data);
@@ -348,5 +147,5 @@ void Network::calculate(const std::vector<double>& input, LayerTrainingData *lay
 
 double Network::get_accuracy()
 {
-	return _training_accuracy;
+	return 0.0;// _training_accuracy;
 }

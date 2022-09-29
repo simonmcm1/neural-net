@@ -6,6 +6,7 @@
 #include "networks/test.h"
 #include "networks/seb.h"
 
+#include "CPUTrainer.h"
 #include "matplotlibcpp.h"
 #include <thread>
 
@@ -14,7 +15,9 @@ bool training = false;
 
 void train_task(Network& n) {
 	std::cout << "TRAINING" << std::endl;
-	n.train();
+	//n.train();
+	CPUTrainer trainer(n);
+	trainer.train();
 	std::cout << "DONE" << std::endl;
 	training = false;
 }
@@ -55,8 +58,7 @@ void test() {
 	n.learn_rate = 0.5;
 	n.build();
 	n.load_data();
-	n.train();
-
+	CPUTrainer(n).train();
 }
 
 int main()

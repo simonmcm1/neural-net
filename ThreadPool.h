@@ -30,6 +30,10 @@ public:
 	void set_thread_index(int thread_index) { _thread_index = thread_index; }
 };
 
+class Worker {
+
+};
+
 class ThreadPool {
 private:
 	int _nthreads;
@@ -37,11 +41,14 @@ private:
 	std::vector<std::queue<Task*>> _scheduled_fixed_thread;
 
 	std::mutex _scheduled_jobs_mutex;
+	std::vector<std::mutex> _scheduled_fixed_thread_mutexs;
 
 	std::vector<std::thread> _threads;
 	void SchedulerLoop(int thread_index);
 
+	//static ThreadPool global_instance;
 public:
+	//static ThreadPool& instance() { return global_instance; }
 	ThreadPool() = delete;
 	ThreadPool(int nthreads);
 	~ThreadPool();

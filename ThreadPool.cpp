@@ -16,15 +16,21 @@ void Task::mark_complete() {
 	is_complete_cv.notify_all();
 }
 
-ThreadPool::ThreadPool(int nthreads) : _nthreads(nthreads)
+//ThreadPool ThreadPool::global_instance(std::thread::hardware_concurrency() - 2);
+
+ThreadPool::ThreadPool(int nthreads) : 
+	_nthreads(nthreads), 
+	_scheduled_fixed_thread(nthreads),
+	_scheduled_fixed_thread_mutexs(nthreads)
 {
 	LOG_DEBUG("ThreadPool: Starting {} threads", nthreads);
+
 	//spin up the actual threads
 	for (int i = 0; i < _nthreads; i++) {
 		_threads.push_back(std::thread(&ThreadPool::SchedulerLoop, this,  i));
 	}
 
-	_scheduled_fixed_thread.resize(nthreads);
+	
 }
 
 ThreadPool::~ThreadPool()
@@ -37,13 +43,19 @@ void ThreadPool::SchedulerLoop(int thread_index)
 	while (true) {
 		Task* job = nullptr;
 		{
-			std::scoped_lock jobs_lock(_scheduled_jobs_mutex);
 			auto& this_thread_queue = _scheduled_fixed_thread.at(thread_index);
+			std::scoped_lock my_lock(_scheduled_fixed_thread_mutexs.at(thread_index));
 			if (!this_thread_queue.empty()) {
 				job = this_thread_queue.front();
 				this_thread_queue.pop();
-			} else if (!_scheduled.empty()) {
-				job =_scheduled.front();
+			}
+		}
+
+		if(job == nullptr) 
+		{
+			std::scoped_lock jobs_lock(_scheduled_jobs_mutex);
+			if (!_scheduled.empty()) {
+				job = _scheduled.front();
 				_scheduled.pop();
 			}
 		}
@@ -63,11 +75,13 @@ void ThreadPool::SchedulerLoop(int thread_index)
 
 void ThreadPool::schedule(Task *task, int on_thread)
 {
-	std::scoped_lock jobs_lock(_scheduled_jobs_mutex);
+	
 	if (on_thread < 0) {
+		std::scoped_lock jobs_lock(_scheduled_jobs_mutex);
 		_scheduled.push(task);
 	}
 	else {
+		std::scoped_lock my_lock(_scheduled_fixed_thread_mutexs.at(on_thread));
 		_scheduled_fixed_thread.at(on_thread).push(task);
 	}
 	
