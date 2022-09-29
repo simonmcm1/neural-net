@@ -81,10 +81,10 @@ public:
 #ifdef SINGLE_THREADED
 	Network() : thread_pool(1) {};
 #else
-	Network() : thread_pool(std::thread::hardware_concurrency() - 1) {};
+	Network() : thread_pool(std::thread::hardware_concurrency() - 2) {};
 #endif
 
-	int batch_size = 32;
+	int batch_size = 128;
 	double learn_rate = 0.05;
 
 	virtual void build() = 0;

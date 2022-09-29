@@ -234,7 +234,7 @@ void Network::process_batch(size_t batch_start, size_t batch_len, Gradients *gra
 					}
 					per_thread_gradients.at(thread_index)->add_to_bias(layer_index, node_index, 1 * layer_data.get_delta(layer_index, node_index));
 				}
-				//cur_input = &layer_data.get_full_output(layer_index);
+				cur_input = &layer_data.get_full_output(layer_index);
 			}
 		}
 	};
