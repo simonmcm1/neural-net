@@ -18,16 +18,13 @@ void Task::mark_complete() {
 
 //ThreadPool ThreadPool::global_instance(std::thread::hardware_concurrency() - 2);
 
-ThreadPool::ThreadPool(int nthreads) : 
-	_nthreads(nthreads), 
-	_scheduled_fixed_thread(nthreads),
-	_scheduled_fixed_thread_mutexs(nthreads)
+ThreadPool::ThreadPool(int nthreads) : _nthreads(nthreads), _workers(nthreads)
 {
 	LOG_DEBUG("ThreadPool: Starting {} threads", nthreads);
 
 	//spin up the actual threads
 	for (int i = 0; i < _nthreads; i++) {
-		_threads.push_back(std::thread(&ThreadPool::SchedulerLoop, this,  i));
+		_workers.at(i).thread = std::thread(&ThreadPool::SchedulerLoop, this, i);
 	}
 
 	
@@ -35,32 +32,25 @@ ThreadPool::ThreadPool(int nthreads) :
 
 ThreadPool::~ThreadPool()
 {	
-	_threads.clear();
+	_workers.clear();
 }
 
 void ThreadPool::SchedulerLoop(int thread_index)
 {
+	auto& this_worker = _workers.at(thread_index);
 	while (true) {
 		Task* job = nullptr;
 		{
-			auto& this_thread_queue = _scheduled_fixed_thread.at(thread_index);
-			std::scoped_lock my_lock(_scheduled_fixed_thread_mutexs.at(thread_index));
-			if (!this_thread_queue.empty()) {
-				job = this_thread_queue.front();
-				this_thread_queue.pop();
-			}
-		}
+			std::unique_lock jobs_lock(this_worker.scheduled_mutex);
+			this_worker.scheduled_signal.wait(jobs_lock, [&] {return !this_worker.scheduled.empty(); });
 
-		if(job == nullptr) 
-		{
-			std::scoped_lock jobs_lock(_scheduled_jobs_mutex);
-			if (!_scheduled.empty()) {
-				job = _scheduled.front();
-				_scheduled.pop();
-			}
+			job = this_worker.scheduled.front();
+			this_worker.scheduled.pop();
+			
 		}
-		
+	
 		if (job == nullptr) {
+			//shouldn't happen with the condition_variable?
 			continue;
 		}
 		else {
@@ -75,16 +65,13 @@ void ThreadPool::SchedulerLoop(int thread_index)
 
 void ThreadPool::schedule(Task *task, int on_thread)
 {
-	
-	if (on_thread < 0) {
-		std::scoped_lock jobs_lock(_scheduled_jobs_mutex);
-		_scheduled.push(task);
-	}
-	else {
-		std::scoped_lock my_lock(_scheduled_fixed_thread_mutexs.at(on_thread));
-		_scheduled_fixed_thread.at(on_thread).push(task);
-	}
-	
+	assert(on_thread >= 0);
+
+	auto& worker = _workers.at(on_thread);
+	std::unique_lock my_lock(worker.scheduled_mutex);
+	worker.scheduled.push(task);
+	my_lock.unlock();
+	worker.scheduled_signal.notify_all();
 }
 
 

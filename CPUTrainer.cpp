@@ -34,12 +34,14 @@ double Gradients::get_bias(size_t layer, size_t index)
 
 void Gradients::add_to_weight(size_t layer, size_t index, double delta)
 {
-	weight_gradients.at(layer)[index] += delta;
+	auto& lw = weight_gradients[layer];
+	auto& weight = lw[index];
+	weight += delta;
 }
 
 void Gradients::add_to_bias(size_t layer, size_t index, double delta)
 {
-	bias_gradients.at(layer)[index] += delta;
+	bias_gradients[layer][index] += delta;
 }
 
 double CPUTrainer::test_training_accuracy() {
@@ -153,14 +155,20 @@ void CPUTrainer::process_batch(size_t batch_start, size_t batch_len, Gradients* 
 	};
 
 	_thread_pool.batch_jobs(task, batch_len);
+	
 
 	//add up all the per-thread results
+	
 	for (auto& per_thread : per_thread_gradients) {
 		for (int layer_index = 0; layer_index < nlayers; layer_index++) {
-			for (int weight_index = 0; weight_index < _network.layers.at(layer_index).weights.size(); weight_index++) {
-				double w = per_thread->get_weight(layer_index, weight_index);
-				gradients->add_to_weight(layer_index, weight_index, w);
-			}
+			batch_function post_process = [&](size_t thread_index, size_t start_index, size_t count) {
+				for (size_t i = start_index; i < start_index + count; i++) {
+					double w = per_thread->get_weight(layer_index, i);
+					gradients->add_to_weight(layer_index, i, w);
+				}
+			};
+			_thread_pool.batch_jobs(post_process, _network.layers.at(layer_index).weights.size());
+
 			for (int bias_index = 0; bias_index < _network.layers.at(layer_index).biases.size(); bias_index++) {
 				gradients->add_to_bias(layer_index, bias_index, per_thread->get_bias(layer_index, bias_index));
 			}

@@ -62,6 +62,21 @@ void read_file(const std::string& path, std::vector<uint8_t>& buffer)
 	file.read((char*)buffer.data(), size);
 }
 
+std::vector<char> read_file(const std::string& path) {
+	std::ifstream file(path, std::ios::ate | std::ios::binary);
+
+	if (!file.is_open()) {
+		throw std::runtime_error("failed to open file " + path);
+	}
+
+	size_t fileSize = (size_t)file.tellg();
+	std::vector<char> buffer(fileSize);
+	file.seekg(0);
+	file.read(buffer.data(), fileSize);
+	file.close();
+	return buffer;
+}
+
 uint32_t from_big_endian(uint8_t* data) {
 	return (data[3] << 0) | (data[2] << 8) | (data[1] << 16) | ((unsigned)data[0] << 24);
 }

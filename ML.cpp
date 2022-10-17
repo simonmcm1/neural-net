@@ -10,6 +10,8 @@
 #include "matplotlibcpp.h"
 #include <thread>
 
+#include "gpu/compute.h"
+
 namespace plt = matplotlibcpp;
 bool training = false;
 
@@ -61,9 +63,14 @@ void test() {
 	CPUTrainer(n).train();
 }
 
+void gputest() {
+	go();
+}
+
 int main()
 {
-	mnist();
+	gputest();
+	//mnist();
 	//test();
 	//seb();
 	return 0;

@@ -20,6 +20,8 @@ double cost_derivative(double output, double expected);
 
 void read_file(const std::string& path, std::vector<uint8_t>& buffer);
 
+std::vector<char> read_file(const std::string& path);
+
 uint32_t from_big_endian(uint8_t* data);
 
 using batch_function = std::function<void(size_t, size_t, size_t)>;
