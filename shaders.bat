@@ -1,1 +1,2 @@
 C:\VulkanSDK\1.2.198.1\Bin\glslc -fshader-stage=compute gpu/assets/compute.glsl -o gpu/assets/compute.spv
+C:\VulkanSDK\1.2.198.1\Bin\glslc -fshader-stage=compute gpu/assets/activate.glsl -o gpu/assets/activate.spv

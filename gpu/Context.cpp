@@ -21,14 +21,14 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(
 void Context::open() 
 {
 	const char* app_name = "Vulkan headless example";
-	vk::ApplicationInfo appInfo("Compute", 0, "Example", 0, VK_API_VERSION_1_0);
+	vk::ApplicationInfo appInfo("Compute", 0, "Example", 0, VK_API_VERSION_1_2);
 
 	vk::InstanceCreateInfo instanceCreateInfo({}, &appInfo);
 
 	uint32_t layerCount = 0;
 	const char* validationLayers[] = { "VK_LAYER_KHRONOS_validation" };
 	layerCount = 1;
-	std::vector<const char*> instanceExtensions = {};
+	std::vector<const char*> instanceExtensions = { "VK_KHR_get_physical_device_properties2"};
 #if DEBUG
 	// Check if layers are available
 	//uint32_t instanceLayerCount;
@@ -103,10 +103,14 @@ void Context::open()
 	// Create logical device
 	vk::DeviceCreateInfo deviceCreateInfo({}, 1, &queueCreateInfo);
 
-	std::vector<const char*> deviceExtensions = {};
+	std::vector<const char*> deviceExtensions = { VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME };
 	deviceCreateInfo.enabledExtensionCount = (uint32_t)deviceExtensions.size();
 	deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
 	device = physical_device.createDevice(deviceCreateInfo);
+
+	
+	//auto& requested_synchronisation2_features = device.request_extension_features<VkPhysicalDeviceSynchronization2FeaturesKHR>(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR);
+	//requested_synchronisation2_features.synchronization2 = VK_TRUE;
 
 	// Get a compute queue
 	queue = device.getQueue(queueFamilyIndex, 0);
