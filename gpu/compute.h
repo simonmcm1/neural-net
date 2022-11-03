@@ -1,6 +1,7 @@
 #pragma once
 #include <vulkan/vulkan.hpp>
 #include "Buffer.h"
+#include "Pipeline.h"
 
 int go();
 
@@ -8,30 +9,28 @@ class Compute {
 private:
 
 	vk::PipelineCache pipelineCache;
-	vk::CommandBuffer commandBuffer;
+	
 	vk::Fence fence;
 	vk::DescriptorPool descriptorPool;
 	vk::DescriptorSetLayout descriptorSetLayout;;
-	vk::DescriptorSet descriptorSet;
+	
 	vk::PipelineLayout pipelineLayout;
 
 	vk::ShaderModule shaderModule;
 
-	vk::Pipeline collect_inputs_pipeline;
-	vk::Pipeline activate_pipeline;
-	vk::Pipeline reset_pipeline;
-
 	Context _context;
-	HostDeviceBufferPair _input_buffer;
-	HostDeviceBufferPair _output_buffer;
-	HostDeviceBufferPair _activated_buffer;
-	HostDeviceBufferPair _data_buffer;
 
-	static constexpr uint32_t kBufferElements = 32;
-	static constexpr vk::DeviceSize kBufferSize = kBufferElements * sizeof(float_t);
+	std::unordered_map<std::string, std::unique_ptr<ComputePass>> _passes;
 
 public:
-	Compute();
-	void run();
+	vk::DescriptorSet descriptor_set;
+	vk::CommandBuffer command_buffer;
+
+	Compute() = delete;
+	Compute(Context& context, std::vector<HostDeviceBufferPair*> &buffers, std::vector<std::string> &pass_names);
 	virtual ~Compute();
+
+	ComputePass &pass(const std::string& name);
+	void run();
+
 };

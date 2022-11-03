@@ -41,4 +41,6 @@ public:
 	double test_training_accuracy();
 	void process_batch(size_t batch_start, size_t batch_len, Gradients* gradients);
 	void train();
+
+	void calculate_layer(Layer& layer);
 };
