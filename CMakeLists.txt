@@ -8,7 +8,7 @@ add_compile_options("/std:c++latest")
 project ("ML")
 
 # Add source to this project's executable.
-add_executable (ML "ML.cpp" "ML.h" "Network.h" "Network.cpp" "DataPoint.h" "DataPoint.cpp" "networks/mnist.h" "util.cpp" "util.h" "networks/mnist.cpp" "networks/test.h" "networks/test.cpp" "networks/seb.h" "networks/seb.cpp" "Timer.h" "Timer.cpp" "ThreadPool.h" "ThreadPool.cpp" "Logging.h" "Logging.cpp" "CPUTrainer.h" "CPUTrainer.cpp" "gpu/compute.cpp" "gpu/compute.h" "gpu/Buffer.cpp" "gpu/Buffer.h" "gpu/Context.cpp" "gpu/Context.h")
+add_executable (ML "ML.cpp" "ML.h" "Network.h" "Network.cpp" "DataPoint.h" "DataPoint.cpp" "networks/mnist.h" "util.cpp" "util.h" "networks/mnist.cpp" "networks/test.h" "networks/test.cpp" "networks/seb.h" "networks/seb.cpp" "Timer.h" "Timer.cpp" "ThreadPool.h" "ThreadPool.cpp" "Logging.h" "Logging.cpp" "CPUTrainer.h" "CPUTrainer.cpp" "gpu/compute.cpp" "gpu/compute.h" "gpu/Buffer.cpp" "gpu/Buffer.h" "gpu/Context.cpp" "gpu/Context.h" "gpu/Pipeline.h" "gpu/Pipeline.cpp")
 
 find_package(Vulkan REQUIRED FATAL_ERROR)
 target_link_libraries (ML PRIVATE ${Vulkan_LIBRARY})

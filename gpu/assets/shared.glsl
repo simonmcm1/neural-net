@@ -16,3 +16,9 @@ layout(binding = 3) buffer ActivatedBuffer {
 
 layout (constant_id = 0) const uint LAYER_SIZE = 300;
 layout (constant_id = 1) const uint INPUT_SIZE = 300;
+
+//push constants block
+layout( push_constant ) uniform constants
+{
+	uint layer_weights_offset;
+} PushConstants;

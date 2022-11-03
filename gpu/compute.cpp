@@ -15,18 +15,10 @@
 
 #include "compute.h"
 #include "../util.h"
+#include "Pipeline.h"
 
 #define LOG(...) printf(__VA_ARGS__)
 
-vk::ShaderModule load_shader(vk::Device &device, const std::vector<char>& bytes) {
-	vk::ShaderModuleCreateInfo create_info{};
-	create_info.codeSize = bytes.size();
-	create_info.pCode = reinterpret_cast<const uint32_t*>(bytes.data());
-
-	vk::ShaderModule shader = device.createShaderModule(create_info);
-	return shader;
-}
-	
 Compute::Compute()
 {
 	LOG("Running headless compute example\n");
@@ -41,11 +33,15 @@ Compute::Compute()
 	uint32_t n = 0;
 	std::generate(computeInput.begin(), computeInput.end(), [&n] { return n++; });
 
-	std::vector<float_t> weights(4);
+	std::vector<float_t> weights(8);
 	weights[0] = 0.15;
 	weights[1] = 0.2;
 	weights[2] = 0.25;
 	weights[3] = 0.3;
+	weights[4] = 0.4;
+	weights[5] = 0.45;
+	weights[6] = 0.5;
+	weights[7] = 0.55;
 
 	std::vector<float_t> inputs(2);
 	inputs[0] = 0.05;
@@ -82,7 +78,8 @@ Compute::Compute()
 		vk::DescriptorSetLayoutCreateInfo descriptorLayout({}, static_cast<uint32_t>(setLayoutBindings.size()), setLayoutBindings.data());
 		descriptorSetLayout = _context.device.createDescriptorSetLayout(descriptorLayout);
 
-		vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo({}, 1, & descriptorSetLayout);
+		vk::PushConstantRange push_constants(vk::ShaderStageFlagBits::eCompute, 0, sizeof(PushConstants));
+		vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo({}, 1, & descriptorSetLayout, 1, &push_constants);
 		pipelineLayout = _context.device.createPipelineLayout(pipelineLayoutCreateInfo);
 
 		vk::DescriptorSetAllocateInfo allocInfo(descriptorPool, 1, &descriptorSetLayout);
@@ -114,51 +111,18 @@ Compute::Compute()
 		vk::PipelineCacheCreateInfo pipelineCacheCreateInfo;
 		pipelineCache = _context.device.createPipelineCache(pipelineCacheCreateInfo);
 
-		// Create pipeline
-		vk::ComputePipelineCreateInfo computePipelineCreateInfo;
-		computePipelineCreateInfo.layout = pipelineLayout;
+		//collect inputs pipeline
+		collect_inputs_pipeline = create_pipeline(_context, "compute", pipelineLayout, pipelineCache);
 
-		struct SpecializationData {
-			uint32_t LAYER_SIZE = 2;
-			uint32_t INPUT_SIZE = 2;
-		} specializationData;
+		//activations pipeline
+		activate_pipeline = create_pipeline(_context, "activate", pipelineLayout, pipelineCache);
 
-		std::vector<vk::SpecializationMapEntry> specializationMapEntries{
-			vk::SpecializationMapEntry(0, 0, sizeof(uint32_t)),
-			vk::SpecializationMapEntry(1, sizeof(uint32_t), sizeof(uint32_t))
-		};
-		vk::SpecializationInfo specializationinfo(specializationMapEntries.size(), specializationMapEntries.data(), sizeof(SpecializationData), &specializationData);
-			
-
-		//collect inputs
-		auto shader_code = read_file("../../../gpu/assets/compute.spv");
-		shaderModule = load_shader(_context.device, shader_code);
-		vk::PipelineShaderStageCreateInfo shaderStage({}, vk::ShaderStageFlagBits::eCompute, shaderModule, "main", &specializationinfo);
-
-		assert(shaderStage.module != VK_NULL_HANDLE);
-		computePipelineCreateInfo.stage = shaderStage;
-
-		auto pipelineRes = _context.device.createComputePipeline(pipelineCache, computePipelineCreateInfo);
-		assert(pipelineRes.result == vk::Result::eSuccess);
-		collect_inputs_pipeline = pipelineRes.value;
-
-		//activations
-		shader_code = read_file("../../../gpu/assets/activate.spv");
-		shaderModule = load_shader(_context.device, shader_code);
-		shaderStage = vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, shaderModule, "main", & specializationinfo);
-
-		assert(shaderStage.module != VK_NULL_HANDLE);
-		computePipelineCreateInfo.stage = shaderStage;
-
-		pipelineRes = _context.device.createComputePipeline(pipelineCache, computePipelineCreateInfo);
-		assert(pipelineRes.result == vk::Result::eSuccess);
-		activate_pipeline = pipelineRes.value;
-
+		//reset layer pipeline
+		reset_pipeline = create_pipeline(_context, "reset", pipelineLayout, pipelineCache);
 
 		// Create a command buffer for compute operations
 		vk::CommandBufferAllocateInfo cmdBufAllocateInfo(_context.command_pool, vk::CommandBufferLevel::ePrimary, 1);
 		commandBuffer = _context.device.allocateCommandBuffers(cmdBufAllocateInfo)[0];
-
 
 		// Fence for compute CB sync
 		vk::FenceCreateInfo fenceCreateInfo(vk::FenceCreateFlagBits::eSignaled);
@@ -170,6 +134,7 @@ Compute::Compute()
 	*/
 	{
 		vk::CommandBufferBeginInfo cmdBufInfo;
+		PushConstants constants{ 0 };
 		commandBuffer.begin(&cmdBufInfo);
 
 
@@ -178,18 +143,36 @@ Compute::Compute()
 		_data_buffer.transfer_in_barrier(commandBuffer);
 		//_output_buffer.transfer_in_barrier(commandBuffer);
 
-		//collect weighted inputs
-		commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, collect_inputs_pipeline);
-		commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);		
-		commandBuffer.dispatch(2, 2, 1);
 
-		//barrier between write and reads
-		_output_buffer.compute_write_read_barrier(commandBuffer);
+		for (uint32_t layer_index = 0; layer_index < 2; layer_index++)
+		{		
+			//collect weighted inputs
+			commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, collect_inputs_pipeline);
+			commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
-		//calculate activations
-		commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, activate_pipeline);
-		commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-		commandBuffer.dispatch(2, 1, 1);
+			constants.layer_weights_offset = layer_index * 4;
+			commandBuffer.pushConstants(pipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, sizeof(PushConstants), &constants);
+			commandBuffer.dispatch(2, 2, 1);
+
+			//barrier on write to output_buffer before it can be read
+			_output_buffer.compute_write_read_barrier(commandBuffer);
+
+			//calculate activations
+			commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, activate_pipeline);
+			commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+			commandBuffer.dispatch(2, 1, 1);
+
+			//barrier on write to activations_buffer before it can be read
+			_activated_buffer.compute_write_read_barrier(commandBuffer);
+
+			//reset output buffer and copy activated to new input
+			commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, reset_pipeline);
+			commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+			commandBuffer.dispatch(2, 1, 1);
+
+		}
+
+
 
 		// Barrier to ensure that shader writes are finished before buffer is read back from GPU
 		//_input_buffer.shader_write_barrier(commandBuffer);

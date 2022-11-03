@@ -19,6 +19,7 @@ private:
 
 	vk::Pipeline collect_inputs_pipeline;
 	vk::Pipeline activate_pipeline;
+	vk::Pipeline reset_pipeline;
 
 	Context _context;
 	HostDeviceBufferPair _input_buffer;
