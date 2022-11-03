@@ -20,7 +20,7 @@ std::unique_ptr<ComputePass> create_pipeline(Context &context, const std::string
 	//specialization
 	struct SpecializationData {
 		uint32_t LAYER_SIZE = 2;
-		uint32_t INPUT_SIZE = 2;
+		uint32_t INPUT_SIZE = 3;
 	} specializationData;
 
 	std::vector<vk::SpecializationMapEntry> specializationMapEntries{

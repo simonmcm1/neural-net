@@ -7,8 +7,14 @@ layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 void main() 
 {
 	uint node_index = gl_GlobalInvocationID.x;
-	if (node_index >= LAYER_SIZE) 
+	if (node_index > LAYER_SIZE) 
 		return;	
+	
+	//set bias in input
+	if (node_index == LAYER_SIZE) {
+		input_buf[node_index] = 1.0;
+		return;
+	}
 
 	//reset out_buf 
 	out_buf[node_index] = 0.0;

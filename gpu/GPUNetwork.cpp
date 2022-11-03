@@ -10,10 +10,15 @@ void GPUNetwork::init(Network& network) {
 	std::vector<uint32_t> layer_weight_sizes;
 	uint32_t max_layer_size = 0;
 	for (const auto layer : network.layers) {
-		for (const auto weight : layer.weights) {
-			weights.push_back(weight);
+		//flatten biases into weights
+		for (int node_index = 0; node_index < layer.size; node_index++) {
+			for (int input_index = 0; input_index < layer.input_size; input_index++) {
+				weights.push_back(layer.weights[node_index * layer.input_size + input_index]);
+			}
+			weights.push_back(layer.biases[node_index]);
 		}
-		layer_weight_sizes.push_back(layer.weights.size());
+
+		layer_weight_sizes.push_back(layer.weights.size() + layer.biases.size());
 		if (layer.size > max_layer_size) {
 			max_layer_size = layer.size;
 		}
@@ -23,6 +28,8 @@ void GPUNetwork::init(Network& network) {
 	for (const auto val : network.training_data[0].data) {
 		inputs.push_back(val);
 	}
+	//bias
+	inputs.push_back(1.0);
 
 	uint32_t output_layer_size = network.layers[network.layers.size() - 1].size;
 
@@ -54,8 +61,9 @@ void GPUNetwork::init(Network& network) {
 	for (uint32_t layer_index = 0; layer_index < network.layers.size(); layer_index++)
 	{
 		auto& layer = network.layers[layer_index];
-		//collect weighted inputs
-		compute->pass("compute").bind_and_dispatch(command_buffer, descriptor_set, layer.size, layer.input_size, 1, constants);
+		// collect weighted inputs
+		// y +1 is bias
+		compute->pass("compute").bind_and_dispatch(command_buffer, descriptor_set, layer.size, layer.input_size + 1, 1, constants);
 
 		//barrier on write to output_buffer before it can be read
 		output_buffer.compute_write_read_barrier(command_buffer);
@@ -67,7 +75,8 @@ void GPUNetwork::init(Network& network) {
 		activated_buffer.compute_write_read_barrier(command_buffer);
 
 		//reset output buffer and copy activated to new input
-		compute->pass("reset").bind_and_dispatch(command_buffer, descriptor_set, layer.size, 1, 1, constants);
+		//+1 on x inserts bias in shader. TODO: better way to do this
+		compute->pass("reset").bind_and_dispatch(command_buffer, descriptor_set, layer.size + 1, 1, 1, constants);
 
 		constants.layer_weights_offset += layer_weight_sizes[layer_index];
 	}
