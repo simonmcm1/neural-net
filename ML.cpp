@@ -10,7 +10,7 @@
 #include "matplotlibcpp.h"
 #include <thread>
 
-#include "gpu/compute.h"
+#include "gpu/GPUNetwork.h"
 
 namespace plt = matplotlibcpp;
 bool training = false;
@@ -64,7 +64,17 @@ void test() {
 }
 
 void gputest() {
-	go();
+	TestNetwork n;
+	n.build();
+	n.load_data();
+	GPUNetwork g;
+	g.init(n);
+
+	std::cout << "TEST:" << std::endl;
+	auto res = n.calculate(n.training_data[0].data);
+	for (auto v : res) {
+		std::cout << v << std::endl;
+	}
 }
 
 int main()
