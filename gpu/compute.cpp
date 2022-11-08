@@ -110,8 +110,6 @@ Compute::~Compute()
 	_context.device.destroyFence(fence);
 	
 	_context.device.destroyShaderModule(shaderModule);
-
-	_context.close();
 }
 
 

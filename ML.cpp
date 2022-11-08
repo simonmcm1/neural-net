@@ -73,7 +73,14 @@ void gputest() {
 	GPUNetwork g;
 	g.init(n);
 
-	std::cout << "TEST:" << std::endl;
+	std::vector<float> gout;
+	g.calculate(n.training_data[0].data, gout);
+	std::cout << "RES:" << std::endl;
+	for (auto v : gout) {
+		std::cout << v << std::endl;
+	}
+
+	std::cout << "EXPECTED:" << std::endl;
 	auto res = n.calculate(n.training_data[0].data);
 	for (auto v : res) {
 		std::cout << v << std::endl;
