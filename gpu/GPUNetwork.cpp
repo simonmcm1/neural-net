@@ -50,7 +50,7 @@ void GPUNetwork::init(Network& network) {
 	auto& command_buffer = compute->command_buffer;
 	auto& descriptor_set = compute->descriptor_set;
 	vk::CommandBufferBeginInfo cmdBufInfo;
-	PushConstants constants{ 0 };
+	PushConstants constants{ 0, 0, 0 };
 	command_buffer.begin(&cmdBufInfo);
 
 	// Barrier to ensure that input buffer transfer is finished before compute shader reads from it
@@ -61,6 +61,10 @@ void GPUNetwork::init(Network& network) {
 	for (uint32_t layer_index = 0; layer_index < network.layers.size(); layer_index++)
 	{
 		auto& layer = network.layers[layer_index];
+
+		constants.input_size = layer.input_size + 1; //+1 for bias
+		constants.layer_size = layer.size;
+
 		// collect weighted inputs
 		// y +1 is bias
 		compute->pass("compute").bind_and_dispatch(command_buffer, descriptor_set, layer.size, layer.input_size + 1, 1, constants);
@@ -77,6 +81,9 @@ void GPUNetwork::init(Network& network) {
 		//reset output buffer and copy activated to new input
 		//+1 on x inserts bias in shader. TODO: better way to do this
 		compute->pass("reset").bind_and_dispatch(command_buffer, descriptor_set, layer.size + 1, 1, 1, constants);
+
+		//barrier on write to activations_buffer before it can be read
+		activated_buffer.compute_write_read_barrier(command_buffer);
 
 		constants.layer_weights_offset += layer_weight_sizes[layer_index];
 	}

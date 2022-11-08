@@ -57,6 +57,7 @@ void mnist()
 
 void test() {
 	TestNetwork n;
+	//MNISTNetwork n;
 	n.learn_rate = 0.5;
 	n.build();
 	n.load_data();
@@ -65,6 +66,8 @@ void test() {
 
 void gputest() {
 	TestNetwork n;
+	//MNISTNetwork n;
+	//SebNetwork n;
 	n.build();
 	n.load_data();
 	GPUNetwork g;
@@ -75,6 +78,7 @@ void gputest() {
 	for (auto v : res) {
 		std::cout << v << std::endl;
 	}
+	//std::cin.get();
 }
 
 int main()

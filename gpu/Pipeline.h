@@ -5,6 +5,8 @@
 
 struct PushConstants {
 	uint32_t layer_weights_offset;
+	uint32_t input_size;
+	uint32_t layer_size;
 };
 
 class ComputePass {

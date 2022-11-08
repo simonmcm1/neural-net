@@ -14,11 +14,12 @@ layout(binding = 3) buffer ActivatedBuffer {
    float activated_buf[ ];
 };
 
-layout (constant_id = 0) const uint LAYER_SIZE = 300;
-layout (constant_id = 1) const uint INPUT_SIZE = 300;
+//layout (constant_id = 0) const uint LAYER_SIZE = 300;
 
 //push constants block
 layout( push_constant ) uniform constants
 {
 	uint layer_weights_offset;
+	uint input_size;
+	uint layer_size;
 } PushConstants;

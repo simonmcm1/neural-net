@@ -12,8 +12,9 @@ float sigmoid(float x)
 void main() 
 {
 	uint node_index = gl_GlobalInvocationID.x;
-	if (node_index >= LAYER_SIZE) 
+	if (node_index >= PushConstants.layer_size) 
 		return;	
 
 	activated_buf[node_index] = sigmoid(out_buf[node_index]);
+	//activated_buf[node_index] = PushConstants.layer_size;
 }

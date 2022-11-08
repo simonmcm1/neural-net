@@ -18,22 +18,22 @@ std::unique_ptr<ComputePass> create_pipeline(Context &context, const std::string
 	result->name = shader_name;
 
 	//specialization
-	struct SpecializationData {
-		uint32_t LAYER_SIZE = 2;
-		uint32_t INPUT_SIZE = 3;
-	} specializationData;
+	//struct SpecializationData {
+	//	uint32_t LAYER_SIZE = 2;
+	//	uint32_t INPUT_SIZE = 3;
+	//} specializationData;
 
-	std::vector<vk::SpecializationMapEntry> specializationMapEntries{
-		vk::SpecializationMapEntry(0, 0, sizeof(uint32_t)),
-		vk::SpecializationMapEntry(1, sizeof(uint32_t), sizeof(uint32_t))
-	};
-	vk::SpecializationInfo specializationinfo(specializationMapEntries.size(), specializationMapEntries.data(), sizeof(SpecializationData), &specializationData);
+	//std::vector<vk::SpecializationMapEntry> specializationMapEntries{
+	//	vk::SpecializationMapEntry(0, 0, sizeof(uint32_t)),
+	//	vk::SpecializationMapEntry(1, sizeof(uint32_t), sizeof(uint32_t))
+	//};
+	//vk::SpecializationInfo specializationinfo(specializationMapEntries.size(), specializationMapEntries.data(), sizeof(SpecializationData), &specializationData);
 
 
 	//shader
 	auto shader_code = read_file("../../../gpu/assets/" + shader_name + ".spv");
 	result->shader_module = load_shader(context.device, shader_code);
-	vk::PipelineShaderStageCreateInfo shaderStage({}, vk::ShaderStageFlagBits::eCompute, result->shader_module, "main", &specializationinfo);
+	vk::PipelineShaderStageCreateInfo shaderStage({}, vk::ShaderStageFlagBits::eCompute, result->shader_module, "main");
 	if ((VkShaderModule)shaderStage.module == VK_NULL_HANDLE) {
 		throw std::runtime_error("failed to create shader stage");
 	}
