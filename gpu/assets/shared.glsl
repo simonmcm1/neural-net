@@ -14,6 +14,10 @@ layout(binding = 3) buffer ActivatedBuffer {
    float activated_buf[ ];
 };
 
+layout(binding = 4) buffer DeltaBuffer {
+   float delta_buf[ ];
+};
+
 //layout (constant_id = 0) const uint LAYER_SIZE = 300;
 
 //push constants block

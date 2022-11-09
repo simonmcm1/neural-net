@@ -29,30 +29,45 @@ void GPUNetwork::init(Network& network) {
 	_output_size = network.layers[network.layers.size() - 1].size;
 	uint32_t input_size = network.layers[0].input_size;
 
-	// Copy input data to VRAM using a staging buffer
 	_input_buffer = HostDeviceBufferPair(&_context, std::max(max_layer_size + 1, input_size + 1) * sizeof(float_t));
 	_output_buffer = HostDeviceBufferPair(&_context, _network_size * sizeof(float_t));
 	_data_buffer = HostDeviceBufferPair(&_context, weights.size() * sizeof(float_t));
 	_activated_buffer = HostDeviceBufferPair(&_context, _network_size * sizeof(float_t));
+	_deltas_buffer = HostDeviceBufferPair(&_context, weights.size() * sizeof(float_t));
 
 	_data_buffer.store(weights.data(), weights.size() * sizeof(float_t));
 
-	std::vector<HostDeviceBufferPair*> buffers = { &_input_buffer, &_output_buffer, &_data_buffer, &_activated_buffer };
+	std::vector<HostDeviceBufferPair*> buffers = { &_input_buffer, &_output_buffer, &_data_buffer, &_activated_buffer, &_deltas_buffer };
 	std::vector<std::string> pipelines = { "compute", "activate", "reset", "clear"};
 	
 	_compute = std::make_unique<Compute>(_context, buffers, pipelines);
 
 	//write command buffer
 	auto& command_buffer = _compute->command_buffer;
-	auto& descriptor_set = _compute->descriptor_set;
 	vk::CommandBufferBeginInfo cmdBufInfo;
-	PushConstants constants{ 0, 0, 0 };
 	command_buffer.begin(&cmdBufInfo);
 
 	// Barrier to ensure that input buffer transfer is finished before compute shader reads from it
 	_input_buffer.transfer_in_barrier(command_buffer);
 	_data_buffer.transfer_in_barrier(command_buffer);
 
+	calculate_commands(command_buffer, network);
+
+	// Barrier to ensure that shader writes are finished before buffer is read back from GPU
+	_activated_buffer.shader_write_barrier(command_buffer);
+
+	// Read back to host visible buffer
+	vk::BufferCopy copyRegion(0, 0, _network_size * sizeof(float_t));
+	command_buffer.copyBuffer(_activated_buffer.device.buffer, _activated_buffer.host.buffer, 1, &copyRegion);
+	_activated_buffer.transfer_out_barrier(command_buffer);
+
+	command_buffer.end();
+}
+
+void GPUNetwork::calculate_commands(vk::CommandBuffer& command_buffer, const Network &network)
+{
+	auto& descriptor_set = _compute->descriptor_set;
+	PushConstants constants{ 0, 0, 0 };
 	constants.layer_weights_offset = 0;
 	constants.layer_output_offset = 0;
 
@@ -87,20 +102,22 @@ void GPUNetwork::init(Network& network) {
 
 		//barrier on write to activations_buffer before it can be read
 		_activated_buffer.compute_write_read_barrier(command_buffer);
-
-		constants.layer_weights_offset += layer_weight_sizes[layer_index];
+		
+		constants.layer_weights_offset += (layer.weights.size() + layer.biases.size());
 		constants.layer_output_offset += layer.size;
 	}
 
-	// Barrier to ensure that shader writes are finished before buffer is read back from GPU
-	_activated_buffer.shader_write_barrier(command_buffer);
 
-	// Read back to host visible buffer
-	vk::BufferCopy copyRegion(0, 0, _network_size * sizeof(float_t));
-	command_buffer.copyBuffer(_activated_buffer.device.buffer, _activated_buffer.host.buffer, 1, &copyRegion);
-	_activated_buffer.transfer_out_barrier(command_buffer);
+}
 
-	command_buffer.end();
+void GPUNetwork::backpropogate_commands(vk::CommandBuffer& command_buffer, const Network& network)
+{
+
+}
+
+void GPUNetwork::training_step(const std::vector<double>& input, const std::vector<double>& expected)
+{
+
 }
 
 void GPUNetwork::calculate(const std::vector<double>& input, std::vector<float>& output) {
@@ -128,6 +145,7 @@ void GPUNetwork::destroy() {
 	_output_buffer.destroy();
 	_data_buffer.destroy();
 	_activated_buffer.destroy();
+	_deltas_buffer.destroy();
 
 	_compute.reset();
 	_context.close();
