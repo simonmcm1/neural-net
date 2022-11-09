@@ -28,6 +28,7 @@ public:
 	double get_output(size_t layer, size_t index) const;
 
 	const std::vector<double>& get_full_output(size_t layer) const;
+
 };
 
 class Layer {

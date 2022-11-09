@@ -33,6 +33,7 @@ public:
 	void transfer_in_barrier(vk::CommandBuffer& command_buffer);
 	void shader_write_barrier(vk::CommandBuffer& command_buffer);
 	void compute_write_read_barrier(vk::CommandBuffer& command_buffer);
+	void compute_write_readwrite_barrier(vk::CommandBuffer& command_buffer);
 	void transfer_out_barrier(vk::CommandBuffer& command_buffer);
 
 	void destroy();

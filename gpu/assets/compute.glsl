@@ -9,7 +9,7 @@ void weighted_add(uint input_index, uint node_index) {
 	uint index = node_index * PushConstants.input_size + input_index;
 	index += PushConstants.layer_weights_offset;
 	float weighted_input = input_buf[input_index] * data_buf[index];
-	atomicAdd(out_buf[node_index], weighted_input); 
+	atomicAdd(out_buf[node_index + PushConstants.layer_output_offset], weighted_input); 
 }
 
 void main() 

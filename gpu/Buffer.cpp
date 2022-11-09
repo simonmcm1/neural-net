@@ -142,23 +142,29 @@ void HostDeviceBufferPair::transfer_out_barrier(vk::CommandBuffer& command_buffe
 
 void HostDeviceBufferPair::compute_write_read_barrier(vk::CommandBuffer& command_buffer)
 {
-	/*vk::BufferMemoryBarrier2KHR barrier(
-		vk::PipelineStageFlagBits2KHR::eComputeShader,
-		vk::AccessFlagBits2KHR::eShaderWrite,
-		vk::PipelineStageFlagBits2KHR::eComputeShader,
-		vk::AccessFlagBits2KHR::eShaderRead,
+	vk::BufferMemoryBarrier barrier(
+		vk::AccessFlagBits::eShaderWrite,
+		vk::AccessFlagBits::eShaderRead,
 		VK_QUEUE_FAMILY_IGNORED,
 		VK_QUEUE_FAMILY_IGNORED,
 		device.buffer,
 		0, VK_WHOLE_SIZE);
 
-	vk::DependencyInfoKHR dependency_info({}, 0, nullptr, 1, &barrier);
+	command_buffer.pipelineBarrier(
+		vk::PipelineStageFlagBits::eComputeShader,
+		vk::PipelineStageFlagBits::eComputeShader,
+		vk::DependencyFlags(0),
+		0, nullptr,
+		1, &barrier,
+		0, nullptr);
 
-	command_buffer.pipelineBarrier2KHR(dependency_info);
-	*/
+}
+
+void HostDeviceBufferPair::compute_write_readwrite_barrier(vk::CommandBuffer& command_buffer)
+{
 	vk::BufferMemoryBarrier barrier(
 		vk::AccessFlagBits::eShaderWrite,
-		vk::AccessFlagBits::eShaderRead,
+		vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead,
 		VK_QUEUE_FAMILY_IGNORED,
 		VK_QUEUE_FAMILY_IGNORED,
 		device.buffer,

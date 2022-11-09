@@ -65,8 +65,8 @@ void test() {
 }
 
 void gputest() {
-	TestNetwork n;
-	//MNISTNetwork n;
+	//TestNetwork n;
+	MNISTNetwork n;
 	//SebNetwork n;
 	n.build();
 	n.load_data();
@@ -81,10 +81,14 @@ void gputest() {
 	}
 
 	std::cout << "EXPECTED:" << std::endl;
-	auto res = n.calculate(n.training_data[0].data);
-	for (auto v : res) {
-		std::cout << v << std::endl;
+	LayerTrainingData ltd(n.layers);
+	n.calculate(n.training_data[0].data, &ltd);
+	for (auto layer: n.layers){
+		for (auto v : ltd.get_full_output(layer.index)) {
+			std::cout << v << std::endl;
+		}
 	}
+
 	//std::cin.get();
 }
 

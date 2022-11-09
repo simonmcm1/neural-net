@@ -15,6 +15,8 @@ void main()
 	if (node_index >= PushConstants.layer_size) 
 		return;	
 
+	node_index += PushConstants.layer_output_offset;
+
 	activated_buf[node_index] = sigmoid(out_buf[node_index]);
 	//activated_buf[node_index] = PushConstants.layer_size;
 }

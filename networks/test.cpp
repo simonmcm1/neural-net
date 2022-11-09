@@ -27,6 +27,10 @@ void TestNetwork::build()
 	output->weights[3] = 0.55;
 	output->biases[0] = 0.60;
 	output->biases[1] = 0.60;
+
+	for (int i = 0; i < layers.size(); i++) {
+		layers[i].index = i;
+	}
 }
 
 void TestNetwork::load_data() {

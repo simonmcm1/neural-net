@@ -17,6 +17,7 @@ private:
 	Context _context;
 
 	uint32_t _output_size;
+	uint32_t _network_size;
 public:
 	void init(Network& network);
 	void destroy();

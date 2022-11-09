@@ -22,4 +22,5 @@ layout( push_constant ) uniform constants
 	uint layer_weights_offset;
 	uint input_size;
 	uint layer_size;
+	uint layer_output_offset;
 } PushConstants;

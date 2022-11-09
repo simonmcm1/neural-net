@@ -8,6 +8,8 @@ void GPUNetwork::init(Network& network) {
 	std::vector<float_t> weights;
 	std::vector<uint32_t> layer_weight_sizes;
 	uint32_t max_layer_size = 0;
+	_network_size = 0;
+
 	for (const auto layer : network.layers) {
 		//flatten biases into weights
 		for (int node_index = 0; node_index < layer.size; node_index++) {
@@ -21,6 +23,7 @@ void GPUNetwork::init(Network& network) {
 		if (layer.size > max_layer_size) {
 			max_layer_size = layer.size;
 		}
+		_network_size += layer.size;
 	}
 
 	_output_size = network.layers[network.layers.size() - 1].size;
@@ -28,14 +31,14 @@ void GPUNetwork::init(Network& network) {
 
 	// Copy input data to VRAM using a staging buffer
 	_input_buffer = HostDeviceBufferPair(&_context, std::max(max_layer_size + 1, input_size + 1) * sizeof(float_t));
-	_output_buffer = HostDeviceBufferPair(&_context, max_layer_size * sizeof(float_t));
+	_output_buffer = HostDeviceBufferPair(&_context, _network_size * sizeof(float_t));
 	_data_buffer = HostDeviceBufferPair(&_context, weights.size() * sizeof(float_t));
-	_activated_buffer = HostDeviceBufferPair(&_context, max_layer_size * sizeof(float_t));
+	_activated_buffer = HostDeviceBufferPair(&_context, _network_size * sizeof(float_t));
 
 	_data_buffer.store(weights.data(), weights.size() * sizeof(float_t));
 
 	std::vector<HostDeviceBufferPair*> buffers = { &_input_buffer, &_output_buffer, &_data_buffer, &_activated_buffer };
-	std::vector<std::string> pipelines = { "compute", "activate", "reset" };
+	std::vector<std::string> pipelines = { "compute", "activate", "reset", "clear"};
 	
 	_compute = std::make_unique<Compute>(_context, buffers, pipelines);
 
@@ -51,6 +54,13 @@ void GPUNetwork::init(Network& network) {
 	_data_buffer.transfer_in_barrier(command_buffer);
 
 	constants.layer_weights_offset = 0;
+	constants.layer_output_offset = 0;
+
+	//clear out buffer to all zeroes since it uses an atomic add instead of assigning
+	constants.layer_size = _network_size;
+	_compute->pass("clear").bind_and_dispatch(command_buffer, descriptor_set, _network_size, 1, 1, constants);
+	_output_buffer.compute_write_readwrite_barrier(command_buffer);
+
 	for (uint32_t layer_index = 0; layer_index < network.layers.size(); layer_index++)
 	{
 		auto& layer = network.layers[layer_index];
@@ -79,13 +89,14 @@ void GPUNetwork::init(Network& network) {
 		_activated_buffer.compute_write_read_barrier(command_buffer);
 
 		constants.layer_weights_offset += layer_weight_sizes[layer_index];
+		constants.layer_output_offset += layer.size;
 	}
 
 	// Barrier to ensure that shader writes are finished before buffer is read back from GPU
 	_activated_buffer.shader_write_barrier(command_buffer);
 
 	// Read back to host visible buffer
-	vk::BufferCopy copyRegion(0, 0, _output_size * sizeof(float_t));
+	vk::BufferCopy copyRegion(0, 0, _network_size * sizeof(float_t));
 	command_buffer.copyBuffer(_activated_buffer.device.buffer, _activated_buffer.host.buffer, 1, &copyRegion);
 	_activated_buffer.transfer_out_barrier(command_buffer);
 
@@ -105,8 +116,8 @@ void GPUNetwork::calculate(const std::vector<double>& input, std::vector<float>&
 	_compute->run();
 
 	// Copy to output
-	output.resize(_output_size);
-	_activated_buffer.host.read_back(output.data(), _output_size * sizeof(float_t));
+	output.resize(_network_size);
+	_activated_buffer.host.read_back(output.data(), _network_size * sizeof(float_t));
 
 	_context.queue.waitIdle();
 }
