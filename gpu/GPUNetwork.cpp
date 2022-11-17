@@ -38,6 +38,12 @@ void GPUNetwork::init(Network& network) {
 	_data_buffer.store(weights.data(), weights.size() * sizeof(float_t));
 
 	std::vector<HostDeviceBufferPair*> buffers = { &_input_buffer, &_output_buffer, &_data_buffer, &_activated_buffer, &_deltas_buffer };
+	
+	for(const auto buffer : buffers) {
+		if (buffer->device.buffer == vk::Buffer(nullptr)) {
+			throw std::runtime_error("buffer was null");
+		}
+	}
 	std::vector<std::string> pipelines = { "compute", "activate", "reset", "clear"};
 	
 	_compute = std::make_unique<Compute>(_context, buffers, pipelines);

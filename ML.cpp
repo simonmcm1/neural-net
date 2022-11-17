@@ -4,7 +4,6 @@
 #include "ML.h"
 #include "networks/mnist.h"
 #include "networks/test.h"
-#include "networks/seb.h"
 
 #include "CPUTrainer.h"
 #include "matplotlibcpp.h"
@@ -65,9 +64,8 @@ void test() {
 }
 
 void gputest() {
-	//TestNetwork n;
-	MNISTNetwork n;
-	//SebNetwork n;
+	TestNetwork n;
+	//MNISTNetwork n;
 	n.build();
 	n.load_data();
 	GPUNetwork g;
@@ -97,7 +95,6 @@ int main()
 	gputest();
 	//mnist();
 	//test();
-	//seb();
 	return 0;
 }
 

@@ -1,4 +1,10 @@
 .vs/
 out/
 data/
+bin/
+build/
+lib/
+lib64
+share/
+pyvenv.cfg
 *.spv

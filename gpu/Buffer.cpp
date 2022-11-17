@@ -6,6 +6,10 @@ Buffer Buffer::create(Context& context, vk::BufferUsageFlags usageFlags, vk::Mem
 	vk::BufferCreateInfo bufferCreateInfo({}, size, usageFlags, vk::SharingMode::eExclusive);
 	vk::Buffer buffer = context.device.createBuffer(bufferCreateInfo);
 
+	if (buffer == (vk::Buffer)nullptr) {
+		throw std::runtime_error("failed to create buffer");
+	}
+
 	// Create the memory backing up the buffer handle
 	vk::PhysicalDeviceMemoryProperties deviceMemoryProperties = context.physical_device.getMemoryProperties();
 	vk::MemoryRequirements memReqs = context.device.getBufferMemoryRequirements(buffer);

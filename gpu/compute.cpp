@@ -51,15 +51,17 @@ Compute::Compute(Context &context, std::vector<HostDeviceBufferPair *> &buffers,
 		descriptor_set = sets[0];
 
 		std::vector<vk::DescriptorBufferInfo> buffer_descriptors;
-		std::vector<vk::WriteDescriptorSet> computeWriteDescriptorSets;;
+		std::vector<vk::WriteDescriptorSet> computeWriteDescriptorSets;
 		for (size_t i = 0; i < buffers.size(); i++) {
-			buffer_descriptors.push_back(vk::DescriptorBufferInfo(buffers[i]->device.buffer, 0, VK_WHOLE_SIZE));
-			computeWriteDescriptorSets.push_back(
-				vk::WriteDescriptorSet(
+			vk::DescriptorBufferInfo info(buffers[i]->device.buffer, 0, VK_WHOLE_SIZE);
+			vk::WriteDescriptorSet write_set(
 					descriptor_set, i, {}, 1,
-					vk::DescriptorType::eStorageBuffer, {}, &buffer_descriptors[i]));
-		}
+					vk::DescriptorType::eStorageBuffer, {}, &info);
+			computeWriteDescriptorSets.push_back(write_set);
+		
 
+		}
+		
 		_context.device.updateDescriptorSets(static_cast<uint32_t>(computeWriteDescriptorSets.size()), computeWriteDescriptorSets.data(), 0, nullptr);
 	
 		vk::PipelineCacheCreateInfo pipelineCacheCreateInfo;

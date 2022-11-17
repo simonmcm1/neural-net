@@ -29,9 +29,12 @@ std::unique_ptr<ComputePass> create_pipeline(Context &context, const std::string
 	//};
 	//vk::SpecializationInfo specializationinfo(specializationMapEntries.size(), specializationMapEntries.data(), sizeof(SpecializationData), &specializationData);
 
-
-	//shader
-	auto shader_code = read_file("../../../gpu/assets/" + shader_name + ".spv");
+#ifdef _WIN32	
+	std::string base_shader_path = "../../../gpu/assets/";
+#else
+	std::string base_shader_path = "../gpu/assets/";
+#endif
+	auto shader_code = read_file(base_shader_path + shader_name + ".spv");
 	result->shader_module = load_shader(context.device, shader_code);
 	vk::PipelineShaderStageCreateInfo shaderStage({}, vk::ShaderStageFlagBits::eCompute, result->shader_module, "main");
 	if ((VkShaderModule)shaderStage.module == VK_NULL_HANDLE) {
@@ -42,12 +45,19 @@ std::unique_ptr<ComputePass> create_pipeline(Context &context, const std::string
 	computePipelineCreateInfo.layout = *pipeline_layout;
 	computePipelineCreateInfo.stage = shaderStage;
 
+auto pipeline = context.device.createComputePipeline(pipeline_cache, computePipelineCreateInfo);
+#ifdef _WIN32
 	auto pipeline = context.device.createComputePipeline(pipeline_cache, computePipelineCreateInfo);
 	if (pipeline.result != vk::Result::eSuccess) {
 		throw std::runtime_error("Failed to create pipeline:" + vk::to_string(pipeline.result));
 	}
-	
 	result->pipeline = pipeline.value;
+#else
+	if (pipeline == (vk::Pipeline)nullptr) {
+		throw std::runtime_error("Failed to create pipeline");
+	}
+	result->pipeline = pipeline;
+#endif
 	return result;
 }
 
