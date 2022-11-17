@@ -1,6 +1,11 @@
 #pragma once
 #include "../Network.h"
 #include "compute.h"
+#include <cstdint>
+
+#ifdef __linux__
+	typedef float float_t;
+#endif
 
 class GPUNetwork {
 private:

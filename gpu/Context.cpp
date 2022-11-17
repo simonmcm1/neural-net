@@ -14,7 +14,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(
 	const char* pMessage,
 	void* pUserData)
 {
-	LOG_DEBUG("[VALIDATION]: %s - %s\n", pLayerPrefix, pMessage);
+	LOG_DEBUG("[VALIDATION]: {} - {}\n", pLayerPrefix, pMessage);
 	return VK_FALSE;
 }
 
@@ -79,13 +79,19 @@ void Context::open()
 	}
 #endif
 
-	// Physical devic
-	std::vector<vk::PhysicalDevice> physicalDevices = instance.enumeratePhysicalDevices();
-
-	physical_device = physicalDevices[1];
-
+	// Pick a discrete physical device if we can
+	std::vector<vk::PhysicalDevice> physical_devices = instance.enumeratePhysicalDevices();
+	physical_device = physical_devices[0];
+	for (const auto &dev : physical_devices) {
+		vk::PhysicalDeviceProperties properties = dev.getProperties();
+		LOG_DEBUG("GPU: {}", properties.deviceName);
+		LOG_DEBUG("  type={}", vk::to_string(properties.deviceType));
+		if( properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) {
+			physical_device = dev;
+		}
+	}
 	vk::PhysicalDeviceProperties deviceProperties = physical_device.getProperties();
-	LOG_DEBUG("GPU: {}", deviceProperties.deviceName);
+	LOG_DEBUG("using {}", deviceProperties.deviceName);
 
 	// Request a single compute queue
 	const float defaultQueuePriority(0.0f);
@@ -103,7 +109,7 @@ void Context::open()
 	// Create logical device
 	vk::DeviceCreateInfo deviceCreateInfo({}, 1, &queueCreateInfo);
 
-	std::vector<const char*> deviceExtensions = { VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME };
+	std::vector<const char*> deviceExtensions = {};
 	deviceCreateInfo.enabledExtensionCount = (uint32_t)deviceExtensions.size();
 	deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
 	device = physical_device.createDevice(deviceCreateInfo);

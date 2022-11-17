@@ -1,6 +1,6 @@
 #pragma once
 #include <iostream>
-#include <format>
+#include <fmt/core.h>
 
 class StdoutLogger {
 private:
@@ -8,7 +8,7 @@ private:
 public:
 	StdoutLogger(const std::string &prefix) : _prefix(prefix) {}
 	template<class... Types> void print(const std::string &str, Types... args) {
-		std::string formatted = std::vformat(str, std::make_format_args(args...));
+		std::string formatted = fmt::vformat(str, fmt::make_format_args(args...));
 		std::cout << "[" << _prefix << "] " << formatted << std::endl;
 	}
 };
