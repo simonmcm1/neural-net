@@ -55,7 +55,7 @@ void Buffer::store(void* data, vk::DeviceSize data_len, bool flush) {
 
 void Buffer::read_back(void* dest, vk::DeviceSize data_len) {
 	void* mapped = context->device.mapMemory(memory, 0, data_len);
-	vk::MappedMemoryRange mappedRange(memory, 0, data_len);
+	vk::MappedMemoryRange mappedRange(memory, 0, VK_WHOLE_SIZE);
 	context->device.invalidateMappedMemoryRanges(1, &mappedRange);
 
 	memcpy(dest, mapped, data_len);
