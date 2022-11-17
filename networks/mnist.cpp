@@ -23,12 +23,12 @@ void MNISTNetwork::build()
 
 void MNISTNetwork::load_data() {
 	std::vector<uint8_t> labels_buffer;
-	read_file("../../../data/mnist/train-labels.idx1-ubyte", labels_buffer);
+	read_file(std::string(DATA_ROOT) + "train-labels.idx1-ubyte", labels_buffer);
 	uint32_t magic = from_big_endian(&labels_buffer[0]);
 	assert(magic == 0x801);
 
 	std::vector<uint8_t> data_buffer;
-	read_file("../../../data/mnist/train-images.idx3-ubyte", data_buffer);
+	read_file(std::string(DATA_ROOT) + "train-images.idx3-ubyte", data_buffer);
 	magic = from_big_endian(&data_buffer[0]);
 	assert(magic == 0x803);
 

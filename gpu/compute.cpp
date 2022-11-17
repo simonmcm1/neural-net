@@ -50,18 +50,25 @@ Compute::Compute(Context &context, std::vector<HostDeviceBufferPair *> &buffers,
 		assert(sets.size() > 0);
 		descriptor_set = sets[0];
 
-		std::vector<vk::DescriptorBufferInfo> buffer_descriptors;
-		std::vector<vk::WriteDescriptorSet> computeWriteDescriptorSets;
+		std::vector<vk::DescriptorBufferInfo> buffer_descriptors(0);
+		std::vector<vk::WriteDescriptorSet> computeWriteDescriptorSets(0);
 		for (size_t i = 0; i < buffers.size(); i++) {
 			vk::DescriptorBufferInfo info(buffers[i]->device.buffer, 0, VK_WHOLE_SIZE);
+			buffer_descriptors.push_back(info);
 			vk::WriteDescriptorSet write_set(
 					descriptor_set, i, {}, 1,
-					vk::DescriptorType::eStorageBuffer, {}, &info);
+					vk::DescriptorType::eStorageBuffer, {}, &buffer_descriptors[i]);
 			computeWriteDescriptorSets.push_back(write_set);
-		
+		}
 
+		// TODO: Why is this needed? 
+		// 		 computeWriteDescriptorSets[i].pBufferInfo[0].buffer is nullptr here even though we set it in the loop above
+		//       this also worked fine in MSVC and was only noticed in linux
+		for (size_t i = 0; i < buffers.size(); i++) {
+			computeWriteDescriptorSets[i].pBufferInfo = &buffer_descriptors[i];
 		}
 		
+
 		_context.device.updateDescriptorSets(static_cast<uint32_t>(computeWriteDescriptorSets.size()), computeWriteDescriptorSets.data(), 0, nullptr);
 	
 		vk::PipelineCacheCreateInfo pipelineCacheCreateInfo;
