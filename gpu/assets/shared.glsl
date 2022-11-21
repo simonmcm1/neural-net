@@ -43,6 +43,6 @@ float sigmoid_derivative(float x) {
 	return fx * (1 - fx);
 }
 
-float cost_derivative(float output, float expected) {
-	return output - expected;
+float cost_derivative(float res, float expected) {
+	return res - expected;
 }

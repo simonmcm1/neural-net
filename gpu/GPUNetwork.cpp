@@ -33,18 +33,26 @@ void GPUNetwork::init(Network& network) {
 	_output_buffer = HostDeviceBufferPair(&_context, _network_size * sizeof(float_t));
 	_data_buffer = HostDeviceBufferPair(&_context, weights.size() * sizeof(float_t));
 	_activated_buffer = HostDeviceBufferPair(&_context, _network_size * sizeof(float_t));
-	_deltas_buffer = HostDeviceBufferPair(&_context, weights.size() * sizeof(float_t));
+	_deltas_buffer = HostDeviceBufferPair(&_context, _network_size * sizeof(float_t));
+	_expected_buffer = HostDeviceBufferPair(&_context, _network_size * sizeof(float_t));
 
 	_data_buffer.store(weights.data(), weights.size() * sizeof(float_t));
 
-	std::vector<HostDeviceBufferPair*> buffers = { &_input_buffer, &_output_buffer, &_data_buffer, &_activated_buffer, &_deltas_buffer };
+	std::vector<HostDeviceBufferPair*> buffers = { 
+		&_input_buffer, 
+		&_output_buffer, 
+		&_data_buffer, 
+		&_activated_buffer, 
+		&_deltas_buffer, 
+		&_expected_buffer
+	};
 
 	for (const auto buffer : buffers) {
 		if (buffer->device.buffer == vk::Buffer(nullptr)) {
 			throw std::runtime_error("buffer was null");
 		}
 	}
-	std::vector<std::string> pipelines = { "compute", "activate", "reset", "clear" };
+	std::vector<std::string> pipelines = { "compute", "activate", "reset", "clear", "deltas"};
 
 	_compute = std::make_unique<Compute>(_context, buffers, pipelines);
 }
@@ -54,6 +62,16 @@ void GPUNetwork::setup_calculate_only_pipeline(const Network& network)
 	auto& cmd = start_commands();
 	init_commands(cmd, network);
 	calculate_commands(cmd, network);
+	readback_commands(cmd, network);
+	end_commands(cmd);
+}
+
+void GPUNetwork::setup_calculate_and_gradients_pipeline(const Network& network)
+{
+	auto& cmd = start_commands();
+	init_commands(cmd, network);
+	calculate_commands(cmd, network);
+	gradient_commands(cmd, network);
 	readback_commands(cmd, network);
 	end_commands(cmd);
 }
@@ -95,13 +113,16 @@ void GPUNetwork::readback_commands(vk::CommandBuffer &command_buffer, const Netw
 	// Barrier to ensure that shader writes are finished before buffer is read back from GPU
 	_activated_buffer.shader_write_barrier(command_buffer);
 	_output_buffer.shader_write_barrier(command_buffer);
+	_deltas_buffer.shader_write_barrier(command_buffer);
 
 	// Read back to host visible buffer
 	vk::BufferCopy copyRegion(0, 0, _network_size * sizeof(float_t));
 	command_buffer.copyBuffer(_activated_buffer.device.buffer, _activated_buffer.host.buffer, 1, &copyRegion);
 	command_buffer.copyBuffer(_output_buffer.device.buffer, _output_buffer.host.buffer, 1, &copyRegion);
+	command_buffer.copyBuffer(_deltas_buffer.device.buffer, _deltas_buffer.host.buffer, 1, &copyRegion);
 	_activated_buffer.transfer_out_barrier(command_buffer);
 	_output_buffer.transfer_out_barrier(command_buffer);
+	_deltas_buffer.transfer_out_barrier(command_buffer);
 }
 
 void GPUNetwork::calculate_commands(vk::CommandBuffer& command_buffer, const Network &network)
@@ -151,22 +172,50 @@ void GPUNetwork::calculate_commands(vk::CommandBuffer& command_buffer, const Net
 void GPUNetwork::gradient_commands(vk::CommandBuffer& command_buffer, const Network& network)
 {
 	_expected_buffer.transfer_in_barrier(command_buffer);
+	auto& descriptor_set = _compute->descriptor_set;
+	PushConstants constants{ 0, 0, 0 };
+	constants.layer_weights_offset = 0;
+	constants.layer_output_offset = _network_size;
+
+	//output layer
+	const Layer& layer = network.layers[network.layers.size() - 1];
+	constants.layer_output_offset -= layer.size;
+	constants.layer_size = layer.size;
+	_compute->pass("deltas").bind_and_dispatch(command_buffer, descriptor_set, layer.size, 1, 1, constants);
+	_deltas_buffer.compute_write_read_barrier(command_buffer);
 
 }
 
 void GPUNetwork::training_step(const Buffers &buffers)
 {
+	std::vector<float_t> inputs;
+	double_vector_to_float(*buffers.input, inputs);
+	//bias
+	inputs.push_back(1.0);
+	_input_buffer.store(inputs.data(), inputs.size() * sizeof(float_t));
+	
+	std::vector<float_t> expected;
+	double_vector_to_float(*buffers.expected, expected);
+	_expected_buffer.store(expected.data(), expected.size() * sizeof(float_t));
 
+	_compute->run();
+
+	// Copy to output
+	buffers.output->resize(_network_size);
+	buffers.activated->resize(_network_size);
+	buffers.deltas->resize(_network_size);
+	_activated_buffer.host.read_back(buffers.activated->data(), _network_size * sizeof(float_t));
+	_output_buffer.host.read_back(buffers.output->data(), _network_size * sizeof(float_t));
+	_deltas_buffer.host.read_back(buffers.deltas->data(), _network_size * sizeof(float_t));
+
+	_context.queue.waitIdle();
 }
 
 void GPUNetwork::calculate(const Buffers &buffers) {
 	std::vector<float_t> inputs;
-	for (const auto val : *buffers.input) {
-		inputs.push_back(static_cast<float_t>(val));
-	}
+	double_vector_to_float(*buffers.input, inputs);
 	//bias
 	inputs.push_back(1.0);
-
 	_input_buffer.store(inputs.data(), inputs.size() * sizeof(float_t));
 
 	_compute->run();

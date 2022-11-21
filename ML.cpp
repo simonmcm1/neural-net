@@ -72,14 +72,14 @@ void gputest() {
 	
 	GPUNetwork g;
 	g.init(n);
-	g.setup_calculate_only_pipeline(n);
+	g.setup_calculate_and_gradients_pipeline(n);
 
 	std::vector<float> output;
 	std::vector<float> activations;
 	std::vector<float> deltas;
 
 
-	g.calculate({ &n.training_data[0].data, nullptr, &output, &activations, nullptr });
+	g.training_step({ &n.training_data[0].data, &n.training_data[0].expected, &output, &activations, &deltas});
 
 	std::cout << "output:" << std::endl;
 	for (auto v : activations) {

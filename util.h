@@ -26,3 +26,5 @@ uint32_t from_big_endian(uint8_t* data);
 
 using batch_function = std::function<void(size_t, size_t, size_t)>;
 void batch_jobs(batch_function& task, int nthreads, size_t data_len);
+
+void double_vector_to_float(const std::vector<double>& a, std::vector<float>& b);

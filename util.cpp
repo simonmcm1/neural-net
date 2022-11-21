@@ -101,3 +101,9 @@ void batch_jobs(batch_function &task, int nthreads, size_t data_len)
 
 }
 
+void double_vector_to_float(const std::vector<double>& a, std::vector<float>& b) 
+{
+	for (const auto val : a) {
+		b.push_back(static_cast<float_t>(val));
+	}
+}
