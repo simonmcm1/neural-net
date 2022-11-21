@@ -47,7 +47,7 @@ void ThreadPool::SchedulerLoop(int thread_index)
 	while (true) {
 		Task* job = nullptr;
 		{
-			if (terminate) {
+			if (this_worker.terminate) {
 				break;
 			}
 
