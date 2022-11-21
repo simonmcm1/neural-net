@@ -47,7 +47,6 @@ std::unique_ptr<ComputePass> create_pipeline(Context &context, const std::string
 
 auto pipeline = context.device.createComputePipeline(pipeline_cache, computePipelineCreateInfo);
 #ifdef _WIN32
-	auto pipeline = context.device.createComputePipeline(pipeline_cache, computePipelineCreateInfo);
 	if (pipeline.result != vk::Result::eSuccess) {
 		throw std::runtime_error("Failed to create pipeline:" + vk::to_string(pipeline.result));
 	}

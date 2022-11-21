@@ -92,7 +92,12 @@ double LayerTrainingData::get_output(size_t layer, size_t index) const {
 const std::vector<double>& LayerTrainingData::get_full_output(size_t layer) const {
 	return output[layer];
 }
-
+const std::vector<double>& LayerTrainingData::get_full_activation_inputs(size_t layer) const {
+	return activation_inputs[layer];
+}
+const std::vector<double>& LayerTrainingData::get_full_deltas(size_t layer) const {
+	return deltas[layer];
+}
 //std::vector<double>& Network::get_result()
 //{
 //	return layers.back().output;

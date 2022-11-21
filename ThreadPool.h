@@ -35,6 +35,7 @@ struct Worker {
 	std::mutex scheduled_mutex;
 	std::condition_variable scheduled_signal;
 	std::queue<Task*> scheduled;
+	bool terminate = false;
 };
 
 class ThreadPool {

@@ -1,7 +1,3 @@
-#if defined(_WIN32)
-#pragma comment(linker, "/subsystem:console")
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

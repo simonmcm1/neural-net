@@ -68,21 +68,52 @@ void gputest() {
 	//MNISTNetwork n;
 	n.build();
 	n.load_data();
+	CPUTrainer trainer(n);
+	
 	GPUNetwork g;
 	g.init(n);
+	g.setup_calculate_only_pipeline(n);
 
-	std::vector<float> gout;
-	g.calculate(n.training_data[0].data, gout);
-	std::cout << "RES:" << std::endl;
-	for (auto v : gout) {
+	std::vector<float> output;
+	std::vector<float> activations;
+	std::vector<float> deltas;
+
+
+	g.calculate({ &n.training_data[0].data, nullptr, &output, &activations, nullptr });
+
+	std::cout << "output:" << std::endl;
+	for (auto v : activations) {
+		std::cout << v << std::endl;
+	}
+	std::cout << "activations:" << std::endl;
+	for (auto v : output) {
+		std::cout << v << std::endl;
+	}
+
+	std::cout << "deltas:" << std::endl;
+	for (auto v : deltas) {
 		std::cout << v << std::endl;
 	}
 
 	std::cout << "EXPECTED:" << std::endl;
 	LayerTrainingData ltd(n.layers);
 	n.calculate(n.training_data[0].data, &ltd);
-	for (auto layer: n.layers){
+	trainer.calculate_deltas(n.training_data[0].data, n.training_data[0].get_expected(), ltd);
+	std::cout << "output:" << std::endl;
+	for (auto layer : n.layers) {
 		for (auto v : ltd.get_full_output(layer.index)) {
+			std::cout << v << std::endl;
+		}
+	}
+	std::cout << "activations" << std::endl;
+	for (auto layer : n.layers) {
+		for (auto v : ltd.get_full_activation_inputs(layer.index)) {
+			std::cout << v << std::endl;
+		}
+	}
+	std::cout << "deltas" << std::endl;
+	for (auto layer : n.layers) {
+		for (auto v : ltd.get_full_deltas(layer.index)) {
 			std::cout << v << std::endl;
 		}
 	}

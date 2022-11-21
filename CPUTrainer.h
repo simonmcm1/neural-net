@@ -42,5 +42,5 @@ public:
 	void process_batch(size_t batch_start, size_t batch_len, Gradients* gradients);
 	void train();
 
-	void calculate_layer(Layer& layer);
+	void calculate_deltas(const std::vector<double>& input, const std::vector<double>& expected, LayerTrainingData &layer_data);
 };

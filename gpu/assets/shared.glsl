@@ -18,6 +18,10 @@ layout(binding = 4) buffer DeltaBuffer {
    float delta_buf[ ];
 };
 
+layout(binding = 5) buffer ExpectedBuffer {
+   float expected_buf[ ];
+};
+
 //layout (constant_id = 0) const uint LAYER_SIZE = 300;
 
 //push constants block
@@ -28,3 +32,17 @@ layout( push_constant ) uniform constants
 	uint layer_size;
 	uint layer_output_offset;
 } PushConstants;
+
+float sigmoid(float x)
+{
+	return 1.0 / (1.0 + exp(-x));
+}
+
+float sigmoid_derivative(float x) {
+	float fx = sigmoid(x);
+	return fx * (1 - fx);
+}
+
+float cost_derivative(float output, float expected) {
+	return output - expected;
+}

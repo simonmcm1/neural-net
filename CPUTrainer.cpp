@@ -63,6 +63,45 @@ double CPUTrainer::test_training_accuracy() {
 	return (double)total_correct / _network.training_data.size();
 }
 
+void CPUTrainer::calculate_deltas(const std::vector<double>& input, const std::vector<double>& expected, LayerTrainingData &layer_data)
+{
+	int nlayers = _network.layers.size();
+	const std::vector<double>& output = layer_data.get_full_output(nlayers - 1);
+
+	//backpropogation
+	//output layer
+	int layer_index = nlayers - 1;
+	auto& out_layer = _network.layers[layer_index];
+	assert(expected.size() == out_layer.size);
+	for (int node_index = 0; node_index < out_layer.size; node_index++) {
+		double o = output[node_index];
+		double cd = cost_derivative(o, expected[node_index]);
+		double ad = sigmoid_derivative(layer_data.get_activation_input(nlayers - 1, node_index));
+		double delta = cd * ad;
+		layer_data.set_delta(nlayers - 1, node_index, delta);
+	}
+
+	//hidden layers
+	for (layer_index = nlayers - 2; layer_index >= 0; layer_index--) {
+		auto& layer = _network.layers[layer_index];
+
+		int last_layer_index = layer_index + 1;
+		auto& last_layer = _network.layers[last_layer_index];
+
+		for (int node_index = 0; node_index < layer.size; node_index++) {
+
+			double sum_of_weighted_errors = 0.0;
+			for (int last_node_index = 0; last_node_index < last_layer.size; last_node_index++) {
+				int weight_index = (last_node_index * last_layer.input_size + node_index);
+				double we = layer_data.get_delta(last_layer_index, last_node_index) * last_layer.weights[weight_index];
+				sum_of_weighted_errors += we;
+			}
+			double new_delta = sum_of_weighted_errors * sigmoid_derivative(layer_data.get_activation_input(layer_index, node_index));
+			layer_data.set_delta(layer_index, node_index, new_delta);
+		}
+	}
+}
+
 void CPUTrainer::process_batch(size_t batch_start, size_t batch_len, Gradients* gradients)
 {
 	//Timer t("Network::process_batch");
@@ -101,44 +140,12 @@ void CPUTrainer::process_batch(size_t batch_start, size_t batch_len, Gradients* 
 			const std::vector<double>& expected = data.get_expected();
 
 			_network.calculate(input, &layer_data);
-			const std::vector<double>& output = layer_data.get_full_output(nlayers - 1);
 
-			//backpropogation
-			//output layer
-			int layer_index = nlayers - 1;
-			auto& out_layer = _network.layers[layer_index];
-			assert(expected.size() == out_layer.size);
-			for (int node_index = 0; node_index < out_layer.size; node_index++) {
-				double o = output[node_index];
-				double cd = cost_derivative(o, expected[node_index]);
-				double ad = sigmoid_derivative(layer_data.get_activation_input(nlayers - 1, node_index));
-				double delta = cd * ad;
-				layer_data.set_delta(nlayers - 1, node_index, delta);
-			}
-
-			//hidden layers
-			for (layer_index = nlayers - 2; layer_index >= 0; layer_index--) {
-				auto& layer = _network.layers[layer_index];
-
-				int last_layer_index = layer_index + 1;
-				auto& last_layer = _network.layers[last_layer_index];
-
-				for (int node_index = 0; node_index < layer.size; node_index++) {
-
-					double sum_of_weighted_errors = 0.0;
-					for (int last_node_index = 0; last_node_index < last_layer.size; last_node_index++) {
-						int weight_index = (last_node_index * last_layer.input_size + node_index);
-						double we = layer_data.get_delta(last_layer_index, last_node_index) * last_layer.weights[weight_index];
-						sum_of_weighted_errors += we;
-					}
-					double new_delta = sum_of_weighted_errors * sigmoid_derivative(layer_data.get_activation_input(layer_index, node_index));
-					layer_data.set_delta(layer_index, node_index, new_delta);
-				}
-			}
+			calculate_deltas(input, expected, layer_data);
 
 			//feed gradients forward
 			const std::vector<double>* cur_input = &input;
-			for (layer_index = 0; layer_index < nlayers; layer_index++) {
+			for (size_t layer_index = 0; layer_index < nlayers; layer_index++) {
 				auto& layer = _network.layers[layer_index];
 
 				for (int node_index = 0; node_index < layer.size; node_index++) {

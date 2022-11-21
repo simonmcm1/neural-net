@@ -32,6 +32,12 @@ ThreadPool::ThreadPool(int nthreads) : _nthreads(nthreads), _workers(nthreads)
 
 ThreadPool::~ThreadPool()
 {	
+	for (auto& t : _workers) {
+		t.terminate = true;
+	}
+	for (auto& t : _workers) {
+		t.thread.join();
+	}
 	_workers.clear();
 }
 
@@ -41,9 +47,15 @@ void ThreadPool::SchedulerLoop(int thread_index)
 	while (true) {
 		Task* job = nullptr;
 		{
-			std::unique_lock jobs_lock(this_worker.scheduled_mutex);
-			this_worker.scheduled_signal.wait(jobs_lock, [&] {return !this_worker.scheduled.empty(); });
+			if (terminate) {
+				break;
+			}
 
+			std::unique_lock jobs_lock(this_worker.scheduled_mutex);
+			auto wait_res = this_worker.scheduled_signal.wait_for(jobs_lock, std::chrono::milliseconds(2000), [&] {return !this_worker.scheduled.empty(); });
+			if (wait_res == false) {
+				continue;
+			}
 			job = this_worker.scheduled.front();
 			this_worker.scheduled.pop();
 			
